@@ -13,8 +13,15 @@ function getPool() {
   }
 
   if (!global.__pengutypePgPool) {
+    const isLocalDatabase =
+      databaseUrl.includes("localhost") ||
+      databaseUrl.includes("127.0.0.1") ||
+      databaseUrl.includes("@db:");
+
     global.__pengutypePgPool = new Pool({
       connectionString: databaseUrl,
+      ssl: isLocalDatabase ? undefined : { rejectUnauthorized: false },
+      max: 10,
     });
   }
 
