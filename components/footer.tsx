@@ -16,6 +16,13 @@ export function Footer() {
       transition={{ delay: 0.8, duration: 0.5 }}
       className="fixed bottom-0 left-0 right-0 z-20 px-6 py-4"
     >
+      <p
+        className="text-center text-xs italic mb-2"
+        style={{ color: currentTheme.sub }}
+      >
+        Alpha build — still in progress.
+      </p>
+
       <div className="max-w-6xl mx-auto flex items-center justify-between">
         {/* Keyboard shortcuts */}
         <div 
@@ -75,7 +82,7 @@ export function Footer() {
           </motion.span>
           
           <motion.a
-            href="https://github.com"
+            href="https://github.com/nrbrtuwu/PenguType"
             target="_blank"
             rel="noopener noreferrer"
             className="p-3 rounded-xl glass transition-all"
