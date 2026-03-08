@@ -287,16 +287,31 @@ export function Results() {
             >
               characters
             </div>
-            <div 
-              className="text-lg font-mono flex items-center gap-1 font-medium"
-            >
-              <span style={{ color: currentTheme.correct }}>{charBreakdown.correct}</span>
-              <span style={{ color: currentTheme.sub }}>/</span>
-              <span style={{ color: currentTheme.incorrect }}>{charBreakdown.incorrect}</span>
-              <span style={{ color: currentTheme.sub }}>/</span>
-              <span style={{ color: currentTheme.extra }}>{charBreakdown.extra}</span>
-              <span style={{ color: currentTheme.sub }}>/</span>
-              <span style={{ color: currentTheme.sub }}>{charBreakdown.missed}</span>
+            <div className="relative inline-flex group">
+              <div className="text-lg font-mono flex items-center gap-1 font-medium cursor-help">
+                <span style={{ color: currentTheme.correct }}>{charBreakdown.correct}</span>
+                <span style={{ color: currentTheme.sub }}>/</span>
+                <span style={{ color: currentTheme.incorrect }}>{charBreakdown.incorrect}</span>
+                <span style={{ color: currentTheme.sub }}>/</span>
+                <span style={{ color: currentTheme.extra }}>{charBreakdown.extra}</span>
+                <span style={{ color: currentTheme.sub }}>/</span>
+                <span style={{ color: currentTheme.sub }}>{charBreakdown.missed}</span>
+              </div>
+
+              <div
+                className="pointer-events-none absolute left-1/2 top-full mt-2 -translate-x-1/2 rounded-lg px-3 py-2 text-xs font-mono whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-20"
+                style={{
+                  color: currentTheme.foreground,
+                  backgroundColor: `${currentTheme.background}f2`,
+                  border: `1px solid ${currentTheme.sub}44`,
+                  boxShadow: `0 8px 24px ${currentTheme.background}cc`
+                }}
+              >
+                <div>correct: {charBreakdown.correct}</div>
+                <div>incorrect: {charBreakdown.incorrect}</div>
+                <div>extra: {charBreakdown.extra}</div>
+                <div>missed: {charBreakdown.missed}</div>
+              </div>
             </div>
           </div>
 

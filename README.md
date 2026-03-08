@@ -71,3 +71,75 @@ public/             # Static assets (icons, etc.)
 - Stats are grouped by exact test bucket:
   - Time mode: duration + language (e.g. 60s + English)
   - Words mode: word count + language (e.g. 25 words + English)
+
+## Database Backup (Vercel + Neon)
+
+The app can back up local typing history to Postgres for persistence and future leaderboard features.
+
+### 1) Create a Neon Postgres database in Vercel
+
+- In Vercel, add a **Neon Postgres** integration to your project.
+- Copy the connection string to `DATABASE_URL`.
+
+### 2) Add environment variable
+
+Create `.env.local` (or use Vercel project env vars):
+
+```bash
+DATABASE_URL=your_neon_connection_string
+```
+
+### Local development with Docker (optional)
+
+If you want to run Postgres locally before deploying to Vercel/Neon:
+
+1. Start local DB
+
+```bash
+npm run db:up
+```
+
+2. Set local connection in `.env.local`
+
+```bash
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/pengutype
+```
+
+3. Run app
+
+```bash
+npm run dev
+```
+
+Useful commands:
+
+```bash
+npm run db:logs
+npm run db:psql
+npm run db:down
+```
+
+### 3) Deploy / run
+
+- API route: `GET/POST /api/results`
+- Table `typing_results` is auto-created on first request.
+- The app syncs local test results in the background using a local anonymous device ID.
+
+This gives you cloud history backups now and a clean base for Discord-auth accounts and leaderboards later.
+
+## Discord Login (identify only)
+
+This project uses Auth.js with Discord OAuth and requests only the `identify` scope.
+
+Set these environment variables in `.env.local` (and Vercel):
+
+```bash
+AUTH_SECRET=your_random_secret
+AUTH_DISCORD_ID=your_discord_client_id
+AUTH_DISCORD_SECRET=your_discord_client_secret
+```
+
+Notes:
+
+- Account identification uses Discord user ID (`session.user.id`).
+- No email scope is requested.

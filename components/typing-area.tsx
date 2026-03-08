@@ -112,6 +112,7 @@ export function TypingArea() {
     words,
     typedChars,
     currentWordIndex,
+    isTestActive,
     isTestComplete,
     handleKeyPress,
     theme,
@@ -151,6 +152,12 @@ export function TypingArea() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (isTestComplete) return;
+
+      const isReloadShortcut = e.key === "F5" || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "r");
+      if (isReloadShortcut) {
+        e.preventDefault();
+        return;
+      }
       
       if (e.ctrlKey || e.metaKey || e.altKey) {
         if (e.key === "Backspace" && (e.ctrlKey || e.metaKey)) {
@@ -178,6 +185,21 @@ export function TypingArea() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyPress, isTestComplete, typedChars, currentWordIndex]);
+
+  useEffect(() => {
+    const hasProgress = typedChars.some((wordChars) => wordChars.length > 0);
+    if (!isTestActive || isTestComplete || !hasProgress) {
+      return;
+    }
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isTestActive, isTestComplete, typedChars]);
 
   // Scroll words into view
   useEffect(() => {

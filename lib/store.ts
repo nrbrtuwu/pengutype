@@ -1,14 +1,16 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { getRandomWords, LanguageKey } from './words';
+import { getRandomWords } from '@/lib/words';
+import type { LanguageKey } from '@/languages';
 import { ThemeKey } from './themes';
 
 export type TestMode = 'time' | 'words';
 export type TimeOption = 15 | 30 | 60 | 120;
 export type WordOption = 10 | 25 | 50 | 100;
 export type RestartKeybind = 'tab-enter' | 'tab';
+export type CloudSyncStatus = 'idle' | 'syncing' | 'synced' | 'error';
 
-interface TestResult {
+export interface TestResult {
   wpm: number;
   rawWpm: number;
   accuracy: number;
@@ -61,6 +63,8 @@ interface TypingState {
   caretStyle: 'line' | 'block' | 'underline';
   fontSize: number;
   restartKeybind: RestartKeybind;
+  cloudSyncStatus: CloudSyncStatus;
+  cloudSyncPendingCount: number;
   
   // Actions
   setMode: (mode: TestMode) => void;
@@ -83,8 +87,28 @@ interface TypingState {
   setCaretStyle: (style: 'line' | 'block' | 'underline') => void;
   setFontSize: (size: number) => void;
   setRestartKeybind: (keybind: RestartKeybind) => void;
+  setCloudSyncState: (status: CloudSyncStatus, pendingCount: number) => void;
+  mergeResults: (incomingResults: TestResult[]) => void;
   addResult: (result: TestResult) => void;
   clearHistory: () => void;
+}
+
+function resultToKey(result: TestResult): string {
+  return [
+    result.timestamp,
+    result.mode,
+    result.language,
+    result.timeOption ?? '',
+    result.wordOption ?? '',
+    result.wpm,
+    result.rawWpm,
+    result.accuracy,
+    result.correctChars,
+    result.incorrectChars,
+    result.extraChars,
+    result.missedChars,
+    result.time,
+  ].join('|');
 }
 
 export const useTypingStore = create<TypingState>()(
@@ -126,6 +150,8 @@ export const useTypingStore = create<TypingState>()(
       caretStyle: 'line',
       fontSize: 24,
       restartKeybind: 'tab-enter',
+      cloudSyncStatus: 'idle',
+      cloudSyncPendingCount: 0,
       
       // Actions
       setMode: (mode) => set({ mode }),
@@ -335,6 +361,34 @@ export const useTypingStore = create<TypingState>()(
       setCaretStyle: (style) => set({ caretStyle: style }),
       setFontSize: (size) => set({ fontSize: size }),
       setRestartKeybind: (restartKeybind) => set({ restartKeybind }),
+      setCloudSyncState: (status, pendingCount) =>
+        set((state) => {
+          if (state.cloudSyncStatus === status && state.cloudSyncPendingCount === pendingCount) {
+            return state;
+          }
+
+          return { cloudSyncStatus: status, cloudSyncPendingCount: pendingCount };
+        }),
+      mergeResults: (incomingResults) =>
+        set((state) => {
+          if (incomingResults.length === 0) {
+            return state;
+          }
+
+          const map = new Map<string, TestResult>();
+
+          for (const result of state.results) {
+            map.set(resultToKey(result), result);
+          }
+
+          for (const result of incomingResults) {
+            map.set(resultToKey(result), result);
+          }
+
+          const merged = [...map.values()].sort((a, b) => a.timestamp - b.timestamp);
+
+          return { results: merged };
+        }),
       addResult: (result) => set({ results: [...get().results, result] }),
       clearHistory: () => set({ results: [] })
     }),

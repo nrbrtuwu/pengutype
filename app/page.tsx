@@ -7,6 +7,7 @@ import { SettingsPanel } from "@/components/settings-panel";
 import { CommandPalette } from "@/components/command-palette";
 import { StatsPanel } from "@/components/stats-panel";
 import { AnimatedBackground } from "@/components/animated-background";
+import { HistoryBackupSync } from "@/components/history-backup-sync";
 import { useTypingStore } from "@/lib/store";
 import { themes } from "@/lib/themes";
 import { useEffect, useState } from "react";
@@ -29,6 +30,8 @@ export default function Home() {
       style={{ backgroundColor: currentTheme.background }}
     >
       <AnimatedBackground />
+      <HistoryBackupSync />
+
       <Header />
       <TypingTest />
       <Footer />
