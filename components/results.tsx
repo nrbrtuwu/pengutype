@@ -2,6 +2,7 @@
 
 import { useTypingStore } from "@/lib/store";
 import { themes } from "@/lib/themes";
+import { calculatePerformanceStats } from "@/lib/typing-metrics";
 import { motion, AnimatePresence } from "framer-motion";
 import { RotateCcw, ChevronRight, Zap, Target, Gauge, TrendingUp } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -18,6 +19,7 @@ export function Results() {
     endTime,
     theme,
     resetTest,
+    retryCurrentTest,
     mode,
     language,
     timeOption,
@@ -26,12 +28,15 @@ export function Results() {
     currentWordIndex,
     restartKeybind,
     results,
+    currentResult,
+    suppressResultRecording,
   } = useTypingStore();
 
   const currentTheme = themes[theme];
   const [showConfetti, setShowConfetti] = useState(false);
 
   const latestResult = results[results.length - 1];
+  const activeResult = currentResult ?? latestResult;
 
   const isSameBucket = (result: (typeof results)[number]) => {
     if (result.mode !== mode || result.language !== language) {
@@ -46,14 +51,27 @@ export function Results() {
   };
 
   const previousBestWpm = useMemo(() => {
-    const previousInBucket = results.slice(0, -1).filter(isSameBucket);
+    const excludeCurrentRecorded =
+      currentResult &&
+      latestResult &&
+      latestResult.timestamp === currentResult.timestamp &&
+      latestResult.mode === currentResult.mode &&
+      latestResult.language === currentResult.language;
+
+    const historyPool = excludeCurrentRecorded ? results.slice(0, -1) : results;
+    const previousInBucket = historyPool.filter(isSameBucket);
     if (previousInBucket.length === 0) {
       return -1;
     }
     return Math.max(...previousInBucket.map((result) => result.wpm));
-  }, [results, mode, language, timeOption, wordOption]);
+  }, [results, mode, language, timeOption, wordOption, currentResult, latestResult]);
 
-  const isNewBest = Boolean(latestResult && isSameBucket(latestResult) && latestResult.wpm > previousBestWpm);
+  const isNewBest = Boolean(
+    !suppressResultRecording &&
+    activeResult &&
+    isSameBucket(activeResult) &&
+    activeResult.wpm > previousBestWpm
+  );
 
   const confettiPieces = useMemo(
     () =>
@@ -66,7 +84,7 @@ export function Results() {
         delay: Math.random() * 0.45,
         duration: 1.2 + Math.random() * 1.2
       })),
-    [latestResult?.timestamp]
+    [activeResult?.timestamp]
   );
 
   useEffect(() => {
@@ -78,16 +96,32 @@ export function Results() {
     setShowConfetti(true);
     const timer = window.setTimeout(() => setShowConfetti(false), 1800);
     return () => window.clearTimeout(timer);
-  }, [isNewBest, latestResult?.timestamp]);
+  }, [isNewBest, activeResult?.timestamp]);
 
-  const timeElapsed = startTime && endTime ? (endTime - startTime) / 1000 : 0;
-  const minutes = timeElapsed / 60;
-  
-  const wpm = minutes > 0 ? Math.round((correctChars / 5) / minutes) : 0;
-  const rawWpm = minutes > 0 ? Math.round(((correctChars + incorrectChars + extraChars) / 5) / minutes) : 0;
-  
-  const totalTyped = correctChars + incorrectChars + extraChars;
-  const accuracy = totalTyped > 0 ? Math.round((correctChars / totalTyped) * 100) : 0;
+  const fallbackTimeElapsed = startTime && endTime ? (endTime - startTime) / 1000 : 0;
+  const displayTimeSeconds = activeResult?.time ?? Math.round(fallbackTimeElapsed);
+  const formattedDisplayTime = Number.isInteger(displayTimeSeconds)
+    ? `${displayTimeSeconds}s`
+    : `${displayTimeSeconds.toFixed(2)}s`;
+
+  const computedMetrics = useMemo(() => {
+    const performanceStats = calculatePerformanceStats(
+      {
+        correctChars,
+        incorrectChars,
+        extraChars,
+        missedChars,
+      },
+      mode === "time" ? timeOption : Math.max(0, fallbackTimeElapsed),
+      0
+    );
+
+    return performanceStats;
+  }, [correctChars, incorrectChars, extraChars, missedChars, mode, timeOption, fallbackTimeElapsed]);
+
+  const wpm = activeResult?.wpm ?? computedMetrics.wpm;
+  const rawWpm = activeResult?.rawWpm ?? computedMetrics.rawWpm;
+  const accuracy = activeResult?.accuracy ?? computedMetrics.accuracy;
 
   const wordsTyped = Math.min(currentWordIndex + 1, words.length);
   const consistency = Math.max(0, 100 - (incorrectChars + extraChars) * 2);
@@ -276,7 +310,7 @@ export function Results() {
               className="text-lg font-mono font-medium"
               style={{ color: currentTheme.foreground }}
             >
-              {mode} {mode === "time" ? `${Math.round(timeElapsed)}s` : `${wordsTyped} words`}
+              {mode} {mode === "time" ? formattedDisplayTime : `${wordsTyped} words`}
             </div>
           </div>
 
@@ -341,7 +375,7 @@ export function Results() {
               className="text-lg font-mono font-medium"
               style={{ color: currentTheme.foreground }}
             >
-              {Math.round(timeElapsed)}s
+              {formattedDisplayTime}
             </div>
           </div>
         </div>
@@ -350,7 +384,7 @@ export function Results() {
       {/* Actions */}
       <div className="flex items-center justify-center gap-4">
         <button
-          onClick={resetTest}
+          onClick={retryCurrentTest}
           className="flex items-center gap-2 px-6 py-3.5 rounded-xl font-medium transition-all duration-200 hover:scale-[1.02]"
           style={{ 
             backgroundColor: `${currentTheme.background}dd`,

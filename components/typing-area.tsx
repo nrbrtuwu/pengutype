@@ -114,12 +114,14 @@ export function TypingArea() {
     currentWordIndex,
     isTestActive,
     isTestComplete,
+    suppressResultRecording,
     handleKeyPress,
     theme,
     smoothCaret,
     caretStyle,
     fontSize,
   } = useTypingStore();
+  const currentTheme = themes[theme];
 
   const containerRef = useRef<HTMLDivElement>(null);
   const wordsRef = useRef<HTMLDivElement>(null);
@@ -232,6 +234,25 @@ export function TypingArea() {
       className="relative outline-none w-full"
       style={{ fontSize: `${effectiveFontSize}px` }}
     >
+      {suppressResultRecording && (
+        <div
+          className="mb-4 rounded-xl px-4 py-3 text-center"
+          style={{
+            border: `2px solid ${currentTheme.incorrect}88`,
+            backgroundColor: `${currentTheme.incorrect}22`,
+            color: currentTheme.foreground,
+            boxShadow: `0 0 22px ${currentTheme.incorrect}33`
+          }}
+        >
+          <p className="text-sm sm:text-base font-bold tracking-wide uppercase">
+            Retry Mode Active
+          </p>
+          <p className="text-xs sm:text-sm mt-1" style={{ color: currentTheme.sub }}>
+            New bests on this retried test will not count toward history or records.
+          </p>
+        </div>
+      )}
+
       {/* Words container */}
       <div
         ref={wordsRef}

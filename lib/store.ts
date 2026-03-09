@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { getRandomWords } from '@/lib/words';
 import type { LanguageKey } from '@/languages';
 import { ThemeKey } from './themes';
+import { calculateCharacterStats, calculatePerformanceStats } from './typing-metrics';
 
 export type TestMode = 'time' | 'words';
 export type TimeOption = 15 | 30 | 60 | 120;
@@ -54,6 +55,7 @@ interface TypingState {
   
   // History
   results: TestResult[];
+  currentResult: TestResult | null;
   
   // UI
   showSettings: boolean;
@@ -65,6 +67,7 @@ interface TypingState {
   restartKeybind: RestartKeybind;
   cloudSyncStatus: CloudSyncStatus;
   cloudSyncPendingCount: number;
+  suppressResultRecording: boolean;
   
   // Actions
   setMode: (mode: TestMode) => void;
@@ -76,6 +79,7 @@ interface TypingState {
   startTest: () => void;
   endTest: () => void;
   resetTest: () => void;
+  retryCurrentTest: () => void;
   handleKeyPress: (key: string) => void;
   updateTimeLeft: (time: number) => void;
   toggleSettings: () => void;
@@ -141,6 +145,7 @@ export const useTypingStore = create<TypingState>()(
       
       // History
       results: [],
+      currentResult: null,
       
       // UI
       showSettings: false,
@@ -152,6 +157,7 @@ export const useTypingStore = create<TypingState>()(
       restartKeybind: 'tab-enter',
       cloudSyncStatus: 'idle',
       cloudSyncPendingCount: 0,
+      suppressResultRecording: false,
       
       // Actions
       setMode: (mode) => set({ mode }),
@@ -176,46 +182,27 @@ export const useTypingStore = create<TypingState>()(
       endTest: () => {
         const state = get();
         const endTime = Date.now();
-        const timeElapsed = state.startTime ? (endTime - state.startTime) / 1000 : 0;
-        
-        // Calculate final stats
-        let totalCorrect = 0;
-        let totalIncorrect = 0;
-        let totalExtra = 0;
-        let totalMissed = 0;
-        
-        state.typedChars.forEach((wordChars, wordIndex) => {
-          const originalWord = state.words[wordIndex] || '';
-          wordChars.forEach((char, charIndex) => {
-            if (char.extra) {
-              totalExtra++;
-            } else if (char.correct) {
-              totalCorrect++;
-            } else {
-              totalIncorrect++;
-            }
-          });
-          // Count missed characters (characters not typed in words that were started)
-          if (wordChars.length > 0 && wordChars.length < originalWord.length) {
-            totalMissed += originalWord.length - wordChars.length;
-          }
+        const elapsedSeconds = state.startTime ? (endTime - state.startTime) / 1000 : 0;
+        const testDurationSeconds = state.mode === 'time'
+          ? Math.min(state.timeOption, Math.max(0.001, elapsedSeconds || state.timeOption))
+          : Math.max(0.001, elapsedSeconds);
+
+        const characterStats = calculateCharacterStats(state.words, state.typedChars);
+        const separatorChars = Math.max(0, state.currentWordIndex);
+        const performanceStats = calculatePerformanceStats(characterStats, testDurationSeconds, 0, {
+          additionalCorrectChars: separatorChars,
+          additionalTypedChars: separatorChars,
         });
         
-        const wpm = timeElapsed > 0 ? Math.round((totalCorrect / 5) / (timeElapsed / 60)) : 0;
-        const rawWpm = timeElapsed > 0 ? Math.round(((totalCorrect + totalIncorrect + totalExtra) / 5) / (timeElapsed / 60)) : 0;
-        const accuracy = (totalCorrect + totalIncorrect) > 0 
-          ? Math.round((totalCorrect / (totalCorrect + totalIncorrect + totalExtra)) * 100) 
-          : 0;
-        
         const result: TestResult = {
-          wpm,
-          rawWpm,
-          accuracy,
-          correctChars: totalCorrect,
-          incorrectChars: totalIncorrect,
-          extraChars: totalExtra,
-          missedChars: totalMissed,
-          time: Math.round(timeElapsed),
+          wpm: performanceStats.wpm,
+          rawWpm: performanceStats.rawWpm,
+          accuracy: performanceStats.accuracy,
+          correctChars: characterStats.correctChars,
+          incorrectChars: characterStats.incorrectChars,
+          extraChars: characterStats.extraChars,
+          missedChars: characterStats.missedChars,
+          time: Number(testDurationSeconds.toFixed(2)),
           mode: state.mode,
           language: state.language,
           timeOption: state.mode === 'time' ? state.timeOption : undefined,
@@ -227,11 +214,12 @@ export const useTypingStore = create<TypingState>()(
           isTestActive: false, 
           isTestComplete: true,
           endTime,
-          correctChars: totalCorrect,
-          incorrectChars: totalIncorrect,
-          extraChars: totalExtra,
-          missedChars: totalMissed,
-          results: [...state.results, result]
+          correctChars: characterStats.correctChars,
+          incorrectChars: characterStats.incorrectChars,
+          extraChars: characterStats.extraChars,
+          missedChars: characterStats.missedChars,
+          currentResult: result,
+          results: state.suppressResultRecording ? state.results : [...state.results, result]
         });
       },
       
@@ -254,7 +242,35 @@ export const useTypingStore = create<TypingState>()(
           correctChars: 0,
           incorrectChars: 0,
           extraChars: 0,
-          missedChars: 0
+          missedChars: 0,
+          currentResult: null,
+          suppressResultRecording: false
+        });
+      },
+
+      retryCurrentTest: () => {
+        const state = get();
+        const words = state.words.length > 0
+          ? state.words
+          : getRandomWords(state.language, state.mode === 'time' ? 200 : state.wordOption);
+
+        set({
+          isTestActive: false,
+          isTestComplete: false,
+          currentWordIndex: 0,
+          currentCharIndex: 0,
+          words,
+          typedWords: [],
+          typedChars: words.map(() => []),
+          startTime: null,
+          endTime: null,
+          timeLeft: state.timeOption,
+          correctChars: 0,
+          incorrectChars: 0,
+          extraChars: 0,
+          missedChars: 0,
+          currentResult: null,
+          suppressResultRecording: true
         });
       },
       

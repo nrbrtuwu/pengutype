@@ -3,6 +3,7 @@
 import { useEffect, useRef, useMemo } from "react";
 import { useTypingStore } from "@/lib/store";
 import { themes } from "@/lib/themes";
+import { calculateCharacterStats, calculatePerformanceStats } from "@/lib/typing-metrics";
 import { Zap, Target, Clock } from "lucide-react";
 
 export function Timer() {
@@ -49,44 +50,27 @@ export function Timer() {
     };
   }, [isTestActive, mode, timeOption, startTime, updateTimeLeft, isTestComplete]);
 
-  // Calculate live WPM - memoized
-  const liveWPM = useMemo(() => {
-    if (!isTestActive || !startTime) return 0;
-    
-    const elapsed = (Date.now() - startTime) / 1000 / 60;
-    if (elapsed < 0.01) return 0;
+  const liveMetrics = useMemo(() => {
+    if (!isTestActive || !startTime) {
+      return { wpm: 0, accuracy: 100 };
+    }
 
-    let correctChars = 0;
-    typedChars.forEach((wordChars) => {
-      wordChars.forEach((char) => {
-        if (char.correct && !char.extra) {
-          correctChars++;
-        }
-      });
+    const elapsedSeconds = (Date.now() - startTime) / 1000;
+    const characterStats = calculateCharacterStats(words, typedChars);
+    const separatorChars = Math.max(0, currentWordIndex);
+    const performanceStats = calculatePerformanceStats(characterStats, elapsedSeconds, 100, {
+      additionalCorrectChars: separatorChars,
+      additionalTypedChars: separatorChars,
     });
 
-    correctChars += Math.max(0, currentWordIndex);
+    return {
+      wpm: performanceStats.wpm,
+      accuracy: performanceStats.accuracy,
+    };
+  }, [isTestActive, startTime, words, typedChars, currentWordIndex, timeLeft]);
 
-    return Math.round((correctChars / 5) / elapsed);
-  }, [isTestActive, startTime, typedChars, currentWordIndex]);
-
-  // Calculate live accuracy - memoized
-  const liveAccuracy = useMemo(() => {
-    let correct = 0;
-    let total = 0;
-
-    typedChars.forEach((wordChars) => {
-      wordChars.forEach((char) => {
-        total++;
-        if (char.correct && !char.extra) {
-          correct++;
-        }
-      });
-    });
-
-    if (total === 0) return 100;
-    return Math.round((correct / total) * 100);
-  }, [typedChars]);
+  const liveWPM = liveMetrics.wpm;
+  const liveAccuracy = liveMetrics.accuracy;
 
   // Progress percentage for time mode
   const progress = mode === "time" ? ((timeOption - timeLeft) / timeOption) * 100 : 0;
