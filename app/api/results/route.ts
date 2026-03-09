@@ -131,6 +131,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
 
+    const normalizedTestTime = Math.max(0, Math.round(result.time));
+
     await ensureResultsTable();
     await dbQuery(
       `
@@ -182,7 +184,7 @@ export async function POST(request: Request) {
         result.incorrectChars,
         result.extraChars,
         result.missedChars,
-        result.time,
+        normalizedTestTime,
         result.mode,
         result.language,
         result.timeOption ?? null,
@@ -273,7 +275,7 @@ export async function POST(request: Request) {
           result.incorrectChars,
           result.extraChars,
           result.missedChars,
-          result.time,
+          normalizedTestTime,
           result.mode,
           result.language,
           result.timeOption ?? null,
