@@ -16,6 +16,7 @@ export function Header() {
     toggleStatsPanel,
     setLanguage,
     language,
+    resetTest,
   } = useTypingStore();
   const { data: session, status } = useSession();
 
@@ -148,7 +149,14 @@ export function Header() {
       >
         <div className="max-w-6xl mx-auto flex items-center justify-between relative">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-4 group">
+          <Link
+            href="/"
+            className="flex items-center gap-4 group"
+            onClick={(event) => {
+              event.preventDefault();
+              resetTest();
+            }}
+          >
             <motion.div
               className="relative w-12 h-12 rounded-2xl flex items-center justify-center overflow-hidden"
               style={{ 
