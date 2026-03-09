@@ -20,15 +20,22 @@ export function useCaretPosition({
   words,
 }: UseCaretPositionParams) {
   const [caretPosition, setCaretPosition] = useState({ x: 0, y: 0 });
+  const [isCaretReady, setIsCaretReady] = useState(false);
 
   const caretHeight = caretStyle === "underline" ? 3 : Math.max(10, Math.round(fontSize * 1.2));
 
   const updateCaretPosition = useCallback(() => {
-    if (!wordsRef.current) return;
+    if (!wordsRef.current) {
+      setIsCaretReady(false);
+      return;
+    }
 
     const container = wordsRef.current;
     const anchor = container.querySelector("[data-caret-anchor]") as HTMLElement | null;
-    if (!anchor) return;
+    if (!anchor) {
+      setIsCaretReady(false);
+      return;
+    }
 
     const containerRect = container.getBoundingClientRect();
     const anchorRect = anchor.getBoundingClientRect();
@@ -50,6 +57,8 @@ export function useCaretPosition({
       }
       return { x: left, y: top };
     });
+
+    setIsCaretReady(true);
   }, [caretHeight, caretStyle, wordsRef]);
 
   useLayoutEffect(() => {
@@ -73,5 +82,6 @@ export function useCaretPosition({
 
   return {
     caretPosition,
+    isCaretReady,
   };
 }

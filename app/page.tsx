@@ -10,19 +10,15 @@ import { AnimatedBackground } from "@/components/animated-background";
 import { HistoryBackupSync } from "@/components/history-backup-sync";
 import { useTypingStore } from "@/lib/store";
 import { themes } from "@/lib/themes";
-import { useEffect, useState } from "react";
 
 export default function Home() {
-  const { theme } = useTypingStore();
-  const [mounted, setMounted] = useState(false);
+  const { theme, hasHydrated } = useTypingStore();
 
-  // Handle hydration
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  if (!hasHydrated) {
+    return null;
+  }
 
-  // Use default theme during SSR
-  const currentTheme = mounted ? themes[theme] : themes.serika_dark;
+  const currentTheme = themes[theme] ?? themes.aurora;
 
   return (
     <main 

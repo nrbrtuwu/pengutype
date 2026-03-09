@@ -103,3 +103,21 @@
     outline-offset: 2px;
   }
 }
+
+.pengu-toast[data-sonner-toast] {
+  will-change: transform, opacity;
+  transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1), opacity 280ms cubic-bezier(0.22, 1, 0.36, 1), height 200ms ease, box-shadow 140ms ease !important;
+}
+
+.pengu-toast[data-sonner-toast][data-x-position="right"] {
+  --y: translateX(110%);
+}
+
+.pengu-toast[data-sonner-toast][data-x-position="right"][data-mounted="true"] {
+  --y: translateX(0);
+}
+
+.pengu-toast[data-sonner-toast][data-x-position="right"][data-removed="true"][data-front="true"][data-swipe-out="false"] {
+  --y: translateX(110%);
+  opacity: 0;
+}

@@ -126,7 +126,7 @@ export function TypingArea() {
   const containerRef = useRef<HTMLDivElement>(null);
   const wordsRef = useRef<HTMLDivElement>(null);
   const effectiveFontSize = Math.round(fontSize * 1.5);
-  const { caretPosition } = useCaretPosition({
+  const { caretPosition, isCaretReady } = useCaretPosition({
     wordsRef,
     caretStyle,
     fontSize: effectiveFontSize,
@@ -262,13 +262,15 @@ export function TypingArea() {
           lineHeight: `${effectiveFontSize * 1.6}px`,
         }}
       >
-        <AnimatedCaret
-          caretPosition={caretPosition}
-          smoothCaret={smoothCaret}
-          caretStyle={caretStyle}
-          fontSize={effectiveFontSize}
-          theme={theme}
-        />
+        {isCaretReady && (
+          <AnimatedCaret
+            caretPosition={caretPosition}
+            smoothCaret={smoothCaret}
+            caretStyle={caretStyle}
+            fontSize={effectiveFontSize}
+            theme={theme}
+          />
+        )}
 
         {/* Words */}
         <div className="flex flex-wrap gap-x-3">

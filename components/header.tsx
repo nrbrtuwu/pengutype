@@ -17,6 +17,7 @@ export function Header() {
     setLanguage,
     language,
     resetTest,
+    cloudLastSyncedAt,
   } = useTypingStore();
   const { data: session, status } = useSession();
 
@@ -26,6 +27,7 @@ export function Header() {
   const [languageQuery, setLanguageQuery] = useState("");
   const [highlightedLanguageIndex, setHighlightedLanguageIndex] = useState(0);
   const [showAccountPanel, setShowAccountPanel] = useState(false);
+  const [databaseJoinedAt, setDatabaseJoinedAt] = useState<string | null>(null);
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const accountPanelRef = useRef<HTMLDivElement | null>(null);
 
@@ -139,6 +141,45 @@ export function Header() {
     session?.user?.id ??
     "unknown user";
 
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId) {
+      setDatabaseJoinedAt(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadDatabaseJoinedAt = async () => {
+      try {
+        const response = await fetch(`/api/results?userId=${encodeURIComponent(userId)}&limit=1&offset=0&includeMeta=1`);
+        if (!response.ok) {
+          return;
+        }
+
+        const data = (await response.json()) as { joinedAt?: string | null };
+        if (!cancelled) {
+          setDatabaseJoinedAt(data.joinedAt ?? null);
+        }
+      } catch {
+      }
+    };
+
+    void loadDatabaseJoinedAt();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.id]);
+
+  const accountCreatedLabel = databaseJoinedAt
+    ? new Date(databaseJoinedAt).toLocaleDateString()
+    : "unknown";
+
+  const lastSyncLabel = cloudLastSyncedAt
+    ? new Date(cloudLastSyncedAt).toLocaleString()
+    : "never";
+
   return (
     <>
       <motion.header
@@ -198,12 +239,10 @@ export function Header() {
               onMouseEnter={(e) => {
                 e.currentTarget.style.color = currentTheme.primary;
                 e.currentTarget.style.textShadow = `0 0 14px ${currentTheme.primary}aa`;
-                e.currentTarget.style.boxShadow = `0 0 20px ${currentTheme.primary}33`;
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.color = currentTheme.foreground;
                 e.currentTarget.style.textShadow = `0 0 8px ${currentTheme.primary}55`;
-                e.currentTarget.style.boxShadow = 'none';
               }}
               title="select language"
             >
@@ -223,11 +262,9 @@ export function Header() {
               whileTap={{ scale: 0.95 }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.color = currentTheme.primary;
-                e.currentTarget.style.boxShadow = `0 0 20px ${currentTheme.primary}33`;
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.color = currentTheme.sub;
-                e.currentTarget.style.boxShadow = 'none';
               }}
               title="account"
             >
@@ -240,6 +277,10 @@ export function Header() {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 transition={{ type: "spring", stiffness: 360, damping: 28 }}
                 className="absolute right-0 top-[calc(100%+0.5rem)] w-60 rounded-2xl p-4 z-50 glass-strong"
+                style={{
+                  border: `1px solid ${currentTheme.primary}66`,
+                  boxShadow: `0 0 26px ${currentTheme.primary}33`,
+                }}
               >
                 <h3 className="text-sm font-semibold mb-1" style={{ color: currentTheme.foreground }}>
                   account
@@ -267,6 +308,14 @@ export function Header() {
                       <span className="text-xs" style={{ color: currentTheme.foreground }}>
                         {accountDisplayName}
                       </span>
+                    </div>
+                    <div className="mb-3 space-y-1">
+                      <p className="text-[11px] leading-4" style={{ color: currentTheme.sub }}>
+                        created: {accountCreatedLabel}
+                      </p>
+                      <p className="text-[11px] leading-4" style={{ color: currentTheme.sub }}>
+                        last sync: {lastSyncLabel}
+                      </p>
                     </div>
                     <button
                       onClick={() => signOut()}
@@ -320,11 +369,9 @@ export function Header() {
               whileTap={{ scale: 0.95 }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.color = currentTheme.primary;
-                e.currentTarget.style.boxShadow = `0 0 20px ${currentTheme.primary}33`;
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.color = currentTheme.sub;
-                e.currentTarget.style.boxShadow = 'none';
               }}
               title="open statistics"
             >
@@ -340,11 +387,9 @@ export function Header() {
               whileTap={{ scale: 0.95 }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.color = currentTheme.primary;
-                e.currentTarget.style.boxShadow = `0 0 20px ${currentTheme.primary}33`;
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.color = currentTheme.sub;
-                e.currentTarget.style.boxShadow = 'none';
               }}
             >
               <Settings size={20} />

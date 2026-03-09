@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import { getRandomWords } from '@/lib/words';
 import type { LanguageKey } from '@/languages';
 import { ThemeKey } from './themes';
-import { calculateCharacterStats, calculatePerformanceStats, calculateSeparatorStats } from './typing-metrics';
+import { calculateCharacterStats, calculatePerformanceStats, calculateSeparatorStats, validateTestAttempt } from './typing-metrics';
 
 export type TestMode = 'time' | 'words';
 export type TimeOption = 15 | 30 | 60 | 120;
@@ -24,6 +24,8 @@ export interface TestResult {
   language: LanguageKey;
   timeOption?: TimeOption;
   wordOption?: WordOption;
+  isValid: boolean;
+  invalidReason?: string;
   timestamp: number;
 }
 
@@ -67,7 +69,10 @@ interface TypingState {
   restartKeybind: RestartKeybind;
   cloudSyncStatus: CloudSyncStatus;
   cloudSyncPendingCount: number;
+  cloudLastSyncedAt: number | null;
+  hasHydrated: boolean;
   suppressResultRecording: boolean;
+  invalidationNotice: { id: number; reason: string } | null;
   
   // Actions
   setMode: (mode: TestMode) => void;
@@ -92,9 +97,11 @@ interface TypingState {
   setFontSize: (size: number) => void;
   setRestartKeybind: (keybind: RestartKeybind) => void;
   setCloudSyncState: (status: CloudSyncStatus, pendingCount: number) => void;
+  setHasHydrated: (hasHydrated: boolean) => void;
   mergeResults: (incomingResults: TestResult[]) => void;
   addResult: (result: TestResult) => void;
   clearHistory: () => void;
+  clearInvalidationNotice: () => void;
 }
 
 function resultToKey(result: TestResult): string {
@@ -104,6 +111,8 @@ function resultToKey(result: TestResult): string {
     result.language,
     result.timeOption ?? '',
     result.wordOption ?? '',
+    result.isValid ? '1' : '0',
+    result.invalidReason ?? '',
     result.wpm,
     result.rawWpm,
     result.accuracy,
@@ -157,7 +166,10 @@ export const useTypingStore = create<TypingState>()(
       restartKeybind: 'tab-enter',
       cloudSyncStatus: 'idle',
       cloudSyncPendingCount: 0,
+      cloudLastSyncedAt: null,
+      hasHydrated: false,
       suppressResultRecording: false,
+      invalidationNotice: null,
       
       // Actions
       setMode: (mode) => set({ mode }),
@@ -193,11 +205,19 @@ export const useTypingStore = create<TypingState>()(
           additionalCorrectChars: separatorStats.correctSeparators,
           additionalTypedChars: separatorStats.typedSeparators,
         });
+        const validation = validateTestAttempt(state.words, state.typedChars, characterStats, separatorStats, {
+          elapsedSeconds: testDurationSeconds,
+          accuracy: performanceStats.accuracy,
+        });
+
+        const finalWpm = validation.isValid ? performanceStats.wpm : 0;
+        const finalRawWpm = validation.isValid ? performanceStats.rawWpm : 0;
+        const finalAccuracy = validation.isValid ? performanceStats.accuracy : 0;
         
         const result: TestResult = {
-          wpm: performanceStats.wpm,
-          rawWpm: performanceStats.rawWpm,
-          accuracy: performanceStats.accuracy,
+          wpm: finalWpm,
+          rawWpm: finalRawWpm,
+          accuracy: finalAccuracy,
           correctChars: characterStats.correctChars,
           incorrectChars: characterStats.incorrectChars,
           extraChars: characterStats.extraChars,
@@ -207,8 +227,15 @@ export const useTypingStore = create<TypingState>()(
           language: state.language,
           timeOption: state.mode === 'time' ? state.timeOption : undefined,
           wordOption: state.mode === 'words' ? state.wordOption : undefined,
+          isValid: validation.isValid,
+          invalidReason: validation.reason ?? undefined,
           timestamp: Date.now()
         };
+
+        const shouldRecordResult = !state.suppressResultRecording && validation.isValid;
+        const nextInvalidationNotice = !validation.isValid && validation.reason
+          ? { id: Date.now(), reason: validation.reason }
+          : state.invalidationNotice;
         
         set({ 
           isTestActive: false, 
@@ -219,7 +246,8 @@ export const useTypingStore = create<TypingState>()(
           extraChars: characterStats.extraChars,
           missedChars: characterStats.missedChars,
           currentResult: result,
-          results: state.suppressResultRecording ? state.results : [...state.results, result]
+          results: shouldRecordResult ? [...state.results, result] : state.results,
+          invalidationNotice: nextInvalidationNotice
         });
       },
       
@@ -244,7 +272,8 @@ export const useTypingStore = create<TypingState>()(
           extraChars: 0,
           missedChars: 0,
           currentResult: null,
-          suppressResultRecording: false
+          suppressResultRecording: false,
+          invalidationNotice: null
         });
       },
 
@@ -270,7 +299,8 @@ export const useTypingStore = create<TypingState>()(
           extraChars: 0,
           missedChars: 0,
           currentResult: null,
-          suppressResultRecording: true
+          suppressResultRecording: true,
+          invalidationNotice: null
         });
       },
       
@@ -377,13 +407,29 @@ export const useTypingStore = create<TypingState>()(
       setCaretStyle: (style) => set({ caretStyle: style }),
       setFontSize: (size) => set({ fontSize: size }),
       setRestartKeybind: (restartKeybind) => set({ restartKeybind }),
+      setHasHydrated: (hasHydrated) => set({ hasHydrated }),
       setCloudSyncState: (status, pendingCount) =>
         set((state) => {
-          if (state.cloudSyncStatus === status && state.cloudSyncPendingCount === pendingCount) {
+          const isSyncedState = status === 'synced' && pendingCount === 0;
+          const nextCloudLastSyncedAt = isSyncedState
+            ? Date.now()
+            : status === 'idle'
+              ? null
+              : state.cloudLastSyncedAt;
+
+          if (
+            state.cloudSyncStatus === status &&
+            state.cloudSyncPendingCount === pendingCount &&
+            state.cloudLastSyncedAt === nextCloudLastSyncedAt
+          ) {
             return state;
           }
 
-          return { cloudSyncStatus: status, cloudSyncPendingCount: pendingCount };
+          return {
+            cloudSyncStatus: status,
+            cloudSyncPendingCount: pendingCount,
+            cloudLastSyncedAt: nextCloudLastSyncedAt,
+          };
         }),
       mergeResults: (incomingResults) =>
         set((state) => {
@@ -406,7 +452,8 @@ export const useTypingStore = create<TypingState>()(
           return { results: merged };
         }),
       addResult: (result) => set({ results: [...get().results, result] }),
-      clearHistory: () => set({ results: [] })
+      clearHistory: () => set({ results: [] }),
+      clearInvalidationNotice: () => set({ invalidationNotice: null })
     }),
     {
       name: 'pengutype-storage',
@@ -421,7 +468,12 @@ export const useTypingStore = create<TypingState>()(
         fontSize: state.fontSize,
         restartKeybind: state.restartKeybind,
         results: state.results
-      })
+      }),
+      onRehydrateStorage: () => (state, error) => {
+        if (!error) {
+          state?.setHasHydrated(true);
+        }
+      }
     }
   )
 );

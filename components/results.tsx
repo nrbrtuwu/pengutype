@@ -2,7 +2,7 @@
 
 import { useTypingStore } from "@/lib/store";
 import { themes } from "@/lib/themes";
-import { calculatePerformanceStats } from "@/lib/typing-metrics";
+import { calculateConsistency, calculatePerformanceStats } from "@/lib/typing-metrics";
 import { motion, AnimatePresence } from "framer-motion";
 import { RotateCcw, ChevronRight, Zap, Target, Gauge, TrendingUp } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -69,6 +69,7 @@ export function Results() {
   const isNewBest = Boolean(
     !suppressResultRecording &&
     activeResult &&
+    activeResult.isValid !== false &&
     isSameBucket(activeResult) &&
     activeResult.wpm > previousBestWpm
   );
@@ -124,7 +125,9 @@ export function Results() {
   const accuracy = activeResult?.accuracy ?? computedMetrics.accuracy;
 
   const testTypeDisplay = mode === "time" ? `time ${timeOption}s` : `words ${wordOption}`;
-  const consistency = Math.max(0, 100 - (incorrectChars + extraChars) * 2);
+  const consistency = activeResult?.isValid === false
+    ? 0
+    : calculateConsistency({ correctChars, incorrectChars, extraChars, missedChars });
 
   const charBreakdown = {
     correct: correctChars,

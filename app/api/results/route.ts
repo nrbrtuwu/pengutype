@@ -297,6 +297,7 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const deviceId = url.searchParams.get("deviceId");
     const userId = url.searchParams.get("userId");
+    const includeMeta = url.searchParams.get("includeMeta") === "1";
     const limit = Number(url.searchParams.get("limit") ?? "200");
     const offset = Number(url.searchParams.get("offset") ?? "0");
 
@@ -461,7 +462,34 @@ export async function GET(request: Request) {
       timestamp: Number(row.result_timestamp)
     }));
 
-    return NextResponse.json({ results });
+    let joinedAt: string | null = null;
+
+    if (queryByUser && includeMeta && userId) {
+      const { rows: joinedRows } = await dbQuery<{ joined_at: string | Date | null }>(
+        `
+        SELECT MIN(first_seen) AS joined_at
+        FROM (
+          SELECT MIN(created_at) AS first_seen
+          FROM typing_results
+          WHERE discord_user_id = $1
+
+          UNION ALL
+
+          SELECT MIN(created_at) AS first_seen
+          FROM typing_best_results
+          WHERE discord_user_id = $1
+        ) AS sources
+        `,
+        [userId]
+      );
+
+      const rawJoinedAt = joinedRows[0]?.joined_at;
+      if (rawJoinedAt) {
+        joinedAt = new Date(rawJoinedAt).toISOString();
+      }
+    }
+
+    return NextResponse.json({ results, joinedAt });
   } catch (error) {
     console.error("Failed to fetch results", error);
     return NextResponse.json({ error: "Failed to fetch results" }, { status: 500 });

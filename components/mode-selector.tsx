@@ -3,6 +3,7 @@
 import { useTypingStore, TestMode, TimeOption, WordOption } from "@/lib/store";
 import { themes } from "@/lib/themes";
 import { Timer, Type, RotateCcw } from "lucide-react";
+import { motion } from "framer-motion";
 
 const modeIcons = {
   time: Timer,
@@ -41,7 +42,10 @@ export function ModeSelector() {
   };
 
   return (
-    <div 
+    <motion.div
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
       className="fixed left-6 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-3"
     >
       {/* Mode selection */}
@@ -155,6 +159,6 @@ export function ModeSelector() {
           <RotateCcw size={18} />
         </button>
       </div>
-    </div>
+    </motion.div>
   );
 }
