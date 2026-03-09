@@ -20,7 +20,7 @@ export function Footer() {
         className="text-center text-xs italic mb-2"
         style={{ color: currentTheme.sub }}
       >
-        Alpha build — still in progress.
+        alpha build — still in progress.
       </p>
 
       <div className="max-w-6xl mx-auto flex items-center justify-between">
@@ -70,7 +70,7 @@ export function Footer() {
             className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl glass"
             whileHover={{ scale: 1.02 }}
           >
-            Made with 
+            made with 
             <motion.span
               animate={{ scale: [1, 1.2, 1] }}
               transition={{ duration: 1.5, repeat: Infinity }}

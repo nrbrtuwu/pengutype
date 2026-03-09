@@ -21,7 +21,7 @@ export function Header() {
   const { data: session, status } = useSession();
 
   const currentTheme = themes[theme];
-  const currentLanguage = getLanguageDisplayName(language);
+  const currentLanguage = getLanguageDisplayName(language).toLowerCase();
   const [showLanguagePicker, setShowLanguagePicker] = useState(false);
   const [languageQuery, setLanguageQuery] = useState("");
   const [highlightedLanguageIndex, setHighlightedLanguageIndex] = useState(0);
@@ -137,7 +137,7 @@ export function Header() {
     session?.user?.name ??
     session?.user?.email ??
     session?.user?.id ??
-    "Unknown user";
+    "unknown user";
 
   return (
     <>
@@ -165,7 +165,7 @@ export function Header() {
               whileHover={{ scale: 1.05, rotate: 3 }}
               whileTap={{ scale: 0.95 }}
             >
-              <span className="text-2xl relative z-10" role="img" aria-label="Penguin">
+              <span className="text-2xl relative z-10" role="img" aria-label="penguin">
                 🐧
               </span>
               <motion.div
@@ -179,7 +179,7 @@ export function Header() {
                 className="text-2xl font-bold tracking-tight"
                 style={{ color: currentTheme.foreground }}
               >
-                PenguType
+                pengutype
               </h1>
             </div>
           </Link>
@@ -205,7 +205,7 @@ export function Header() {
                 e.currentTarget.style.textShadow = `0 0 8px ${currentTheme.primary}55`;
                 e.currentTarget.style.boxShadow = 'none';
               }}
-              title="Select language"
+              title="select language"
             >
               <Languages size={20} />
               <span className="text-sm font-medium tracking-wide">{currentLanguage}</span>
@@ -229,7 +229,7 @@ export function Header() {
                 e.currentTarget.style.color = currentTheme.sub;
                 e.currentTarget.style.boxShadow = 'none';
               }}
-              title="Account"
+              title="account"
             >
               <CircleUser size={20} />
             </motion.button>
@@ -242,7 +242,7 @@ export function Header() {
                 className="absolute right-0 top-[calc(100%+0.5rem)] w-60 rounded-2xl p-4 z-50 glass-strong"
               >
                 <h3 className="text-sm font-semibold mb-1" style={{ color: currentTheme.foreground }}>
-                  Account
+                  account
                 </h3>
                 {status === "authenticated" && session?.user?.id ? (
                   <>
@@ -287,13 +287,13 @@ export function Header() {
                         e.currentTarget.style.boxShadow = "none";
                       }}
                     >
-                      Sign out
+                      sign out
                     </button>
                   </>
                 ) : (
                   <>
                     <p className="text-xs mb-2" style={{ color: currentTheme.sub }}>
-                      Sign in with Discord (identify only).
+                      sign in with discord (identify only).
                     </p>
                     <button
                       onClick={() => signIn("discord")}
@@ -304,7 +304,7 @@ export function Header() {
                         border: `1px solid ${currentTheme.primary}55`
                       }}
                     >
-                      Sign in with Discord
+                      sign in with discord
                     </button>
                   </>
                 )}
@@ -326,7 +326,7 @@ export function Header() {
                 e.currentTarget.style.color = currentTheme.sub;
                 e.currentTarget.style.boxShadow = 'none';
               }}
-              title="Open statistics"
+              title="open statistics"
             >
               <BarChart3 size={20} />
             </motion.button>
@@ -380,7 +380,7 @@ export function Header() {
                 type="text"
                 value={languageQuery}
                 onChange={(e) => setLanguageQuery(e.target.value)}
-                placeholder="Type a language..."
+                placeholder="type a language..."
                 autoFocus
                 className="w-full bg-transparent outline-none"
                 style={{ color: currentTheme.foreground }}
@@ -415,12 +415,12 @@ export function Header() {
                       setLanguageQuery("");
                     }}
                   >
-                    {getLanguageDisplayName(key)}
+                    {getLanguageDisplayName(key).toLowerCase()}
                   </button>
                 ))
               ) : (
                 <div className="px-4 py-6 text-sm" style={{ color: currentTheme.sub }}>
-                  No languages found
+                  no languages found
                 </div>
               )}
             </div>

@@ -123,7 +123,7 @@ export function Results() {
   const rawWpm = activeResult?.rawWpm ?? computedMetrics.rawWpm;
   const accuracy = activeResult?.accuracy ?? computedMetrics.accuracy;
 
-  const wordsTyped = Math.min(currentWordIndex + 1, words.length);
+  const testTypeDisplay = mode === "time" ? `time ${timeOption}s` : `words ${wordOption}`;
   const consistency = Math.max(0, 100 - (incorrectChars + extraChars) * 2);
 
   const charBreakdown = {
@@ -189,12 +189,11 @@ export function Results() {
             className="inline-flex items-center px-4 py-2 rounded-full text-sm font-bold tracking-wide"
             style={{
               background: `linear-gradient(135deg, ${currentTheme.primary}33, ${currentTheme.caret}33)`,
-              border: `1px solid ${currentTheme.primary}66`,
               color: currentTheme.foreground,
               boxShadow: `0 0 24px ${currentTheme.primary}33`
             }}
           >
-            🎉 New Best!
+            🎉 new best!
           </span>
         </motion.div>
       )}
@@ -205,7 +204,6 @@ export function Results() {
           className="text-center p-6 rounded-2xl transition-all duration-200 hover:scale-[1.02]"
           style={{ 
             backgroundColor: `${currentTheme.background}dd`,
-            border: `1px solid ${currentTheme.primary}33`,
           }}
         >
           <Zap className="mx-auto mb-2" size={24} style={{ color: currentTheme.primary }} />
@@ -216,7 +214,7 @@ export function Results() {
             {wpm}
           </div>
           <div 
-            className="text-sm uppercase tracking-wider mt-2 font-medium"
+            className="text-sm tracking-wider mt-2 font-medium"
             style={{ color: currentTheme.sub }}
           >
             wpm
@@ -227,7 +225,6 @@ export function Results() {
           className="text-center p-6 rounded-2xl transition-all duration-200 hover:scale-[1.02]"
           style={{ 
             backgroundColor: `${currentTheme.background}dd`,
-            border: `1px solid ${currentTheme.sub}22`,
           }}
         >
           <Target className="mx-auto mb-2" size={24} style={{ color: currentTheme.foreground }} />
@@ -238,7 +235,7 @@ export function Results() {
             {accuracy}%
           </div>
           <div 
-            className="text-sm uppercase tracking-wider mt-2 font-medium"
+            className="text-sm tracking-wider mt-2 font-medium"
             style={{ color: currentTheme.sub }}
           >
             accuracy
@@ -249,7 +246,6 @@ export function Results() {
           className="text-center p-6 rounded-2xl transition-all duration-200 hover:scale-[1.02]"
           style={{ 
             backgroundColor: `${currentTheme.background}dd`,
-            border: `1px solid ${currentTheme.sub}22`,
           }}
         >
           <Gauge className="mx-auto mb-2" size={24} style={{ color: currentTheme.foreground }} />
@@ -260,7 +256,7 @@ export function Results() {
             {rawWpm}
           </div>
           <div 
-            className="text-sm uppercase tracking-wider mt-2 font-medium"
+            className="text-sm tracking-wider mt-2 font-medium"
             style={{ color: currentTheme.sub }}
           >
             raw
@@ -271,7 +267,6 @@ export function Results() {
           className="text-center p-6 rounded-2xl transition-all duration-200 hover:scale-[1.02]"
           style={{ 
             backgroundColor: `${currentTheme.background}dd`,
-            border: `1px solid ${currentTheme.sub}22`,
           }}
         >
           <TrendingUp className="mx-auto mb-2" size={24} style={{ color: currentTheme.foreground }} />
@@ -282,7 +277,7 @@ export function Results() {
             {Math.round(consistency)}%
           </div>
           <div 
-            className="text-sm uppercase tracking-wider mt-2 font-medium"
+            className="text-sm tracking-wider mt-2 font-medium"
             style={{ color: currentTheme.sub }}
           >
             consistency
@@ -295,13 +290,12 @@ export function Results() {
         className="rounded-2xl p-6 mb-8"
         style={{ 
           backgroundColor: `${currentTheme.background}dd`,
-          border: `1px solid ${currentTheme.sub}22`,
         }}
       >
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
           <div>
             <div 
-              className="text-xs uppercase tracking-wider mb-2 font-medium"
+              className="text-xs tracking-wider mb-2 font-medium"
               style={{ color: currentTheme.sub }}
             >
               test type
@@ -310,13 +304,13 @@ export function Results() {
               className="text-lg font-mono font-medium"
               style={{ color: currentTheme.foreground }}
             >
-              {mode} {mode === "time" ? formattedDisplayTime : `${wordsTyped} words`}
+              {testTypeDisplay}
             </div>
           </div>
 
           <div>
             <div 
-              className="text-xs uppercase tracking-wider mb-2 font-medium"
+              className="text-xs tracking-wider mb-2 font-medium"
               style={{ color: currentTheme.sub }}
             >
               characters
@@ -337,7 +331,6 @@ export function Results() {
                 style={{
                   color: currentTheme.foreground,
                   backgroundColor: `${currentTheme.background}f2`,
-                  border: `1px solid ${currentTheme.sub}44`,
                   boxShadow: `0 8px 24px ${currentTheme.background}cc`
                 }}
               >
@@ -351,22 +344,22 @@ export function Results() {
 
           <div>
             <div 
-              className="text-xs uppercase tracking-wider mb-2 font-medium"
+              className="text-xs tracking-wider mb-2 font-medium"
               style={{ color: currentTheme.sub }}
             >
               language
             </div>
             <div 
-              className="text-lg font-mono font-medium capitalize"
+              className="text-lg font-mono font-medium"
               style={{ color: currentTheme.foreground }}
             >
-              {language}
+              {language.toLowerCase()}
             </div>
           </div>
 
           <div>
             <div 
-              className="text-xs uppercase tracking-wider mb-2 font-medium"
+              className="text-xs tracking-wider mb-2 font-medium"
               style={{ color: currentTheme.sub }}
             >
               time
@@ -388,12 +381,11 @@ export function Results() {
           className="flex items-center gap-2 px-6 py-3.5 rounded-xl font-medium transition-all duration-200 hover:scale-[1.02]"
           style={{ 
             backgroundColor: `${currentTheme.background}dd`,
-            border: `1px solid ${currentTheme.sub}33`,
             color: currentTheme.foreground 
           }}
         >
           <RotateCcw size={18} />
-          <span>Try Again</span>
+          <span>try again</span>
         </button>
 
         <button
@@ -405,7 +397,7 @@ export function Results() {
             boxShadow: `0 0 20px ${currentTheme.primary}44`
           }}
         >
-          <span>Next Test</span>
+          <span>next test</span>
           <ChevronRight size={18} />
         </button>
       </div>
@@ -416,12 +408,12 @@ export function Results() {
           className="text-sm font-medium"
           style={{ color: currentTheme.sub }}
         >
-          Press{" "}
+          press{" "}
           <kbd 
             className="px-2 py-1 rounded-lg text-xs font-mono font-bold" 
             style={{ backgroundColor: currentTheme.secondary, color: currentTheme.foreground }}
           >
-            Tab
+            tab
           </kbd>
           {restartKeybind === "tab-enter" && (
             <>
@@ -430,7 +422,7 @@ export function Results() {
                 className="px-2 py-1 rounded-lg text-xs font-mono font-bold"
                 style={{ backgroundColor: currentTheme.secondary, color: currentTheme.foreground }}
               >
-                Enter
+                enter
               </kbd>
             </>
           )}

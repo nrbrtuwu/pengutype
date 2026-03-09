@@ -3,7 +3,7 @@
 import { useEffect, useRef, useMemo } from "react";
 import { useTypingStore } from "@/lib/store";
 import { themes } from "@/lib/themes";
-import { calculateCharacterStats, calculatePerformanceStats } from "@/lib/typing-metrics";
+import { calculateCharacterStats, calculatePerformanceStats, calculateSeparatorStats } from "@/lib/typing-metrics";
 import { Zap, Target, Clock } from "lucide-react";
 
 export function Timer() {
@@ -57,10 +57,10 @@ export function Timer() {
 
     const elapsedSeconds = (Date.now() - startTime) / 1000;
     const characterStats = calculateCharacterStats(words, typedChars);
-    const separatorChars = Math.max(0, currentWordIndex);
+    const separatorStats = calculateSeparatorStats(words, typedChars, currentWordIndex);
     const performanceStats = calculatePerformanceStats(characterStats, elapsedSeconds, 100, {
-      additionalCorrectChars: separatorChars,
-      additionalTypedChars: separatorChars,
+      additionalCorrectChars: separatorStats.correctSeparators,
+      additionalTypedChars: separatorStats.typedSeparators,
     });
 
     return {

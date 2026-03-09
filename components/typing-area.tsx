@@ -244,11 +244,11 @@ export function TypingArea() {
             boxShadow: `0 0 22px ${currentTheme.incorrect}33`
           }}
         >
-          <p className="text-sm sm:text-base font-bold tracking-wide uppercase">
-            Retry Mode Active
+          <p className="text-sm sm:text-base font-bold tracking-wide">
+            retry mode active
           </p>
           <p className="text-xs sm:text-sm mt-1" style={{ color: currentTheme.sub }}>
-            New bests on this retried test will not count toward history or records.
+            new bests on this retried test will not count toward history or records.
           </p>
         </div>
       )}

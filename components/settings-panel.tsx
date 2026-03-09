@@ -29,8 +29,8 @@ export function SettingsPanel() {
   const fontSizes = [16, 20, 24, 28, 32];
   const caretStyles: ("line" | "block" | "underline")[] = ["line", "block", "underline"];
   const restartKeybindOptions: { key: "tab-enter" | "tab"; label: string }[] = [
-    { key: "tab-enter", label: "Tab + Enter" },
-    { key: "tab", label: "Tab" }
+    { key: "tab-enter", label: "tab + enter" },
+    { key: "tab", label: "tab" }
   ];
 
   if (!showSettings) {
@@ -74,7 +74,7 @@ export function SettingsPanel() {
                     className="text-2xl font-bold"
                     style={{ color: currentTheme.foreground }}
                   >
-                    Settings
+                    settings
                   </h2>
                 </div>
                 <motion.button
@@ -93,10 +93,10 @@ export function SettingsPanel() {
                 <div className="flex items-center gap-2 mb-4">
                   <Palette size={18} style={{ color: currentTheme.primary }} />
                   <h3 
-                    className="text-sm uppercase tracking-wider font-bold"
+                    className="text-sm tracking-wider font-bold"
                     style={{ color: currentTheme.foreground }}
                   >
-                    Theme
+                    theme
                   </h3>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
@@ -148,10 +148,10 @@ export function SettingsPanel() {
                 <div className="flex items-center gap-2 mb-4">
                   <Globe size={18} style={{ color: currentTheme.primary }} />
                   <h3 
-                    className="text-sm uppercase tracking-wider font-bold"
+                    className="text-sm tracking-wider font-bold"
                     style={{ color: currentTheme.foreground }}
                   >
-                    Language
+                    language
                   </h3>
                 </div>
                 <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-2 hide-scrollbar">
@@ -187,10 +187,10 @@ export function SettingsPanel() {
                 <div className="flex items-center gap-2 mb-4">
                   <Type size={18} style={{ color: currentTheme.primary }} />
                   <h3 
-                    className="text-sm uppercase tracking-wider font-bold"
+                    className="text-sm tracking-wider font-bold"
                     style={{ color: currentTheme.foreground }}
                   >
-                    Font Size
+                    font size
                   </h3>
                 </div>
                 <div className="flex gap-2">
@@ -232,10 +232,10 @@ export function SettingsPanel() {
                 <div className="flex items-center gap-2 mb-4">
                   <Keyboard size={18} style={{ color: currentTheme.primary }} />
                   <h3
-                    className="text-sm uppercase tracking-wider font-bold"
+                    className="text-sm tracking-wider font-bold"
                     style={{ color: currentTheme.foreground }}
                   >
-                    Restart Shortcut
+                    restart shortcut
                   </h3>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
@@ -277,20 +277,20 @@ export function SettingsPanel() {
                 <div className="flex items-center gap-2 mb-4">
                   <Keyboard size={18} style={{ color: currentTheme.primary }} />
                   <h3 
-                    className="text-sm uppercase tracking-wider font-bold"
+                    className="text-sm tracking-wider font-bold"
                     style={{ color: currentTheme.foreground }}
                   >
-                    Caret
+                    caret
                   </h3>
                 </div>
 
                 {/* Caret style */}
                 <div className="mb-4">
                   <label 
-                    className="text-xs uppercase tracking-wider mb-2 block font-medium"
+                    className="text-xs tracking-wider mb-2 block font-medium"
                     style={{ color: currentTheme.sub }}
                   >
-                    Style
+                    style
                   </label>
                   <div className="flex gap-2">
                     {caretStyles.map((style) => (
@@ -335,7 +335,7 @@ export function SettingsPanel() {
                     className="text-sm font-medium"
                     style={{ color: currentTheme.foreground }}
                   >
-                    Smooth caret animation
+                    smooth caret animation
                   </label>
                   <motion.button
                     onClick={() => setSmoothCaret(!smoothCaret)}

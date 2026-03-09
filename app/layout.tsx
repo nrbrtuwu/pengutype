@@ -15,8 +15,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'PenguType',
-  description: 'A sleek, customizable typing test to measure your speed and accuracy. Multiple languages, themes, and modes.',
+  title: 'pengutype',
+  description: 'a sleek, customizable typing test to measure your speed and accuracy. multiple languages, themes, and modes.',
   icons: {
     icon: '/icon.svg',
     shortcut: '/icon.svg',

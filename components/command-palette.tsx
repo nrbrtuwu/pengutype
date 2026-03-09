@@ -46,7 +46,7 @@ export function CommandPalette() {
         id: `theme-${key}`,
         icon: <Palette size={16} />,
         label: t.name,
-        category: "Theme",
+        category: "theme",
         action: () => {
           setTheme(key as ThemeKey);
           toggleCommandPalette();
@@ -60,7 +60,7 @@ export function CommandPalette() {
         id: `lang-${key}`,
         icon: <Globe size={16} />,
         label: getLanguageDisplayName(key),
-        category: "Language",
+        category: "language",
         action: () => {
           setLanguage(key as LanguageKey);
           toggleCommandPalette();
@@ -72,8 +72,8 @@ export function CommandPalette() {
     cmds.push({
       id: "mode-time",
       icon: <Clock size={16} />,
-      label: "Time mode",
-      category: "Mode",
+      label: "time mode",
+      category: "mode",
       action: () => {
         setMode("time");
         toggleCommandPalette();
@@ -82,8 +82,8 @@ export function CommandPalette() {
     cmds.push({
       id: "mode-words",
       icon: <Hash size={16} />,
-      label: "Words mode",
-      category: "Mode",
+      label: "words mode",
+      category: "mode",
       action: () => {
         setMode("words");
         toggleCommandPalette();
@@ -96,7 +96,7 @@ export function CommandPalette() {
         id: `time-${t}`,
         icon: <Clock size={16} />,
         label: `${t} seconds`,
-        category: "Time",
+        category: "time",
         action: () => {
           setMode("time");
           setTimeOption(t as 15 | 30 | 60 | 120);
@@ -111,7 +111,7 @@ export function CommandPalette() {
         id: `words-${w}`,
         icon: <Hash size={16} />,
         label: `${w} words`,
-        category: "Words",
+        category: "words",
         action: () => {
           setMode("words");
           setWordOption(w as 10 | 25 | 50 | 100);
@@ -124,30 +124,30 @@ export function CommandPalette() {
     cmds.push({
       id: "restart",
       icon: <RotateCcw size={16} />,
-      label: "Restart test",
-      category: "Action",
+      label: "restart test",
+      category: "action",
       action: () => {
         resetTest();
         toggleCommandPalette();
       },
-      shortcut: restartKeybind === "tab" ? "Tab" : "Tab + Enter"
+      shortcut: restartKeybind === "tab" ? "tab" : "tab + enter"
     });
     cmds.push({
       id: "settings",
       icon: <Settings size={16} />,
-      label: "Open settings",
-      category: "Action",
+      label: "open settings",
+      category: "action",
       action: () => {
         toggleSettings();
         toggleCommandPalette();
       },
-      shortcut: "Esc"
+      shortcut: "esc"
     });
     cmds.push({
       id: "stats",
       icon: <BarChart3 size={16} />,
-      label: "Open statistics",
-      category: "Action",
+      label: "open statistics",
+      category: "action",
       action: () => {
         toggleStatsPanel();
         toggleCommandPalette();
@@ -267,7 +267,7 @@ export function CommandPalette() {
               <Search size={18} style={{ color: currentTheme.sub }} />
               <input
                 type="text"
-                placeholder="Search commands..."
+                placeholder="search commands..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="flex-1 bg-transparent outline-none text-base"
@@ -287,7 +287,7 @@ export function CommandPalette() {
               {Object.entries(groupedCommands).map(([category, cmds]) => (
                 <div key={category}>
                   <div 
-                    className="px-4 py-2 text-xs uppercase tracking-wider"
+                    className="px-4 py-2 text-xs tracking-wider"
                     style={{ color: currentTheme.sub }}
                   >
                     {category}

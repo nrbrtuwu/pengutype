@@ -28,7 +28,7 @@ export function ModeSelector() {
 
   const timeOptions: TimeOption[] = [15, 30, 60, 120];
   const wordOptions: WordOption[] = [10, 25, 50, 100];
-  const restartShortcutLabel = restartKeybind === "tab" ? "Tab" : "Tab + Enter";
+  const restartShortcutLabel = restartKeybind === "tab" ? "tab" : "tab + enter";
 
   // Hide during active test or when complete
   if (isTestActive || isTestComplete) {
@@ -150,7 +150,7 @@ export function ModeSelector() {
           style={{
             color: currentTheme.sub,
           }}
-          title={`Restart (${restartShortcutLabel})`}
+          title={`restart (${restartShortcutLabel})`}
         >
           <RotateCcw size={18} />
         </button>

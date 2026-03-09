@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import { getRandomWords } from '@/lib/words';
 import type { LanguageKey } from '@/languages';
 import { ThemeKey } from './themes';
-import { calculateCharacterStats, calculatePerformanceStats } from './typing-metrics';
+import { calculateCharacterStats, calculatePerformanceStats, calculateSeparatorStats } from './typing-metrics';
 
 export type TestMode = 'time' | 'words';
 export type TimeOption = 15 | 30 | 60 | 120;
@@ -188,10 +188,10 @@ export const useTypingStore = create<TypingState>()(
           : Math.max(0.001, elapsedSeconds);
 
         const characterStats = calculateCharacterStats(state.words, state.typedChars);
-        const separatorChars = Math.max(0, state.currentWordIndex);
+        const separatorStats = calculateSeparatorStats(state.words, state.typedChars, state.currentWordIndex);
         const performanceStats = calculatePerformanceStats(characterStats, testDurationSeconds, 0, {
-          additionalCorrectChars: separatorChars,
-          additionalTypedChars: separatorChars,
+          additionalCorrectChars: separatorStats.correctSeparators,
+          additionalTypedChars: separatorStats.typedSeparators,
         });
         
         const result: TestResult = {

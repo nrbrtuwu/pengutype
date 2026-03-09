@@ -174,14 +174,14 @@ export function StatsPanel() {
                 <div className="flex items-center gap-3">
                   <BarChart3 size={22} style={{ color: currentTheme.primary }} />
                   <h2 className="text-2xl font-bold" style={{ color: currentTheme.foreground }}>
-                    Statistics
+                    statistics
                   </h2>
                 </div>
                 <div className="flex items-center gap-2">
                   {results.length > 0 && (
                     <button
                       onClick={() => {
-                        if (confirm("Are you sure you want to clear all history?")) {
+                        if (confirm("are you sure you want to clear all history?")) {
                           clearHistory();
                         }
                       }}
@@ -189,7 +189,7 @@ export function StatsPanel() {
                       style={{ backgroundColor: `${currentTheme.sub}22`, color: currentTheme.sub }}
                     >
                       <Trash2 size={14} />
-                      Clear
+                      clear
                     </button>
                   )}
                   <button

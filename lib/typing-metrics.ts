@@ -11,6 +11,11 @@ export type CharacterStats = {
   missedChars: number;
 };
 
+export type SeparatorStats = {
+  typedSeparators: number;
+  correctSeparators: number;
+};
+
 export function calculateCharacterStats(words: string[], typedChars: TypedCharacter[][]): CharacterStats {
   let correctChars = 0;
   let incorrectChars = 0;
@@ -44,6 +49,36 @@ export function calculateCharacterStats(words: string[], typedChars: TypedCharac
     incorrectChars,
     extraChars,
     missedChars,
+  };
+}
+
+export function calculateSeparatorStats(
+  words: string[],
+  typedChars: TypedCharacter[][],
+  currentWordIndex: number
+): SeparatorStats {
+  const typedSeparators = Math.max(0, currentWordIndex);
+  let correctSeparators = 0;
+
+  const completedWords = Math.min(currentWordIndex, words.length);
+
+  for (let wordIndex = 0; wordIndex < completedWords; wordIndex++) {
+    const targetWord = words[wordIndex] ?? "";
+    const typedWord = typedChars[wordIndex] ?? [];
+
+    if (!targetWord || typedWord.length !== targetWord.length) {
+      continue;
+    }
+
+    const isPerfectWord = typedWord.every((typedChar) => !typedChar.extra && typedChar.correct);
+    if (isPerfectWord) {
+      correctSeparators++;
+    }
+  }
+
+  return {
+    typedSeparators,
+    correctSeparators,
   };
 }
 
