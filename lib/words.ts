@@ -49,3 +49,47 @@ export function shuffleArray<T>(array: T[]): T[] {
   }
   return shuffled;
 }
+
+export function getSpellingChain(language: LanguageKey, minLength = 3): string[] {
+  const wordList = languages[language].words;
+  const normalized = Array.from(
+    new Set(
+      wordList
+        .map((word) => word.trim().toLowerCase())
+        .filter((word) => word.length >= minLength)
+        .filter((word) => !/\s/.test(word))
+    )
+  );
+
+  if (normalized.length === 0) {
+    return [];
+  }
+
+  const byLength = new Map<number, string[]>();
+  for (const word of normalized) {
+    const group = byLength.get(word.length) ?? [];
+    group.push(word);
+    byLength.set(word.length, group);
+  }
+
+  const lengths = [...byLength.keys()].sort((a, b) => a - b);
+  const startLength = lengths.includes(minLength)
+    ? minLength
+    : lengths.find((len) => len > minLength) ?? lengths[0];
+
+  const chain: string[] = [];
+  let currentLength = startLength;
+
+  while (byLength.has(currentLength)) {
+    const candidates = byLength.get(currentLength) ?? [];
+    if (candidates.length === 0) {
+      break;
+    }
+
+    const pick = candidates[Math.floor(Math.random() * candidates.length)];
+    chain.push(pick);
+    currentLength += 1;
+  }
+
+  return chain;
+}

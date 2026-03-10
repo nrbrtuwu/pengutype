@@ -5,12 +5,14 @@ import { useTypingStore } from "@/lib/store";
 import { themes } from "@/lib/themes";
 import { languages, getLanguageDisplayName, LanguageKey } from "@/lib/words";
 import { motion } from "framer-motion";
-import { Settings, BarChart3, Languages, CircleUser } from "lucide-react";
+import { Settings, BarChart3, Languages, CircleUser, Type } from "lucide-react";
 import { signIn, signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 
 export function Header() {
   const {
+    gameMode,
+    setGameMode,
     theme,
     toggleSettings,
     toggleStatsPanel,
@@ -26,10 +28,24 @@ export function Header() {
   const [showLanguagePicker, setShowLanguagePicker] = useState(false);
   const [languageQuery, setLanguageQuery] = useState("");
   const [highlightedLanguageIndex, setHighlightedLanguageIndex] = useState(0);
+  const [showGameModePicker, setShowGameModePicker] = useState(false);
+  const [gameModeQuery, setGameModeQuery] = useState("");
+  const [highlightedGameModeIndex, setHighlightedGameModeIndex] = useState(0);
   const [showAccountPanel, setShowAccountPanel] = useState(false);
   const [databaseJoinedAt, setDatabaseJoinedAt] = useState<string | null>(null);
-  const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const languageOptionRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const gameModeOptionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const accountPanelRef = useRef<HTMLDivElement | null>(null);
+
+  const gameModes = useMemo(
+    () => [
+      { key: "normal", label: "normal" },
+      { key: "spell-ladder", label: "spell ladder" },
+    ],
+    []
+  );
+
+  const currentGameModeLabel = gameModes.find((modeOption) => modeOption.key === gameMode)?.label ?? "normal";
 
   const filteredLanguages = useMemo(() => {
     const query = languageQuery.trim().toLowerCase();
@@ -44,6 +60,16 @@ export function Header() {
       return displayName.includes(query) || key.toLowerCase().includes(query);
     });
   }, [languageQuery]);
+
+  const filteredGameModes = useMemo(() => {
+    const query = gameModeQuery.trim().toLowerCase();
+
+    if (!query) {
+      return gameModes;
+    }
+
+    return gameModes.filter((modeOption) => modeOption.label.toLowerCase().includes(query));
+  }, [gameModes, gameModeQuery]);
 
   useEffect(() => {
     if (!showLanguagePicker) return;
@@ -87,6 +113,50 @@ export function Header() {
   }, [showLanguagePicker, filteredLanguages, highlightedLanguageIndex, setLanguage]);
 
   useEffect(() => {
+    if (!showGameModePicker) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setShowGameModePicker(false);
+        return;
+      }
+
+      if (filteredGameModes.length === 0) {
+        return;
+      }
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setHighlightedGameModeIndex((prev) => (prev + 1) % filteredGameModes.length);
+        return;
+      }
+
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setHighlightedGameModeIndex((prev) => (prev - 1 + filteredGameModes.length) % filteredGameModes.length);
+        return;
+      }
+
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const selected = filteredGameModes[highlightedGameModeIndex];
+        if (!selected) return;
+
+        setGameMode(selected.key as "normal" | "spell-ladder");
+        if (selected.key === "normal") {
+          resetTest();
+        }
+        setShowGameModePicker(false);
+        setGameModeQuery("");
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [showGameModePicker, filteredGameModes, highlightedGameModeIndex, setGameMode, resetTest]);
+
+  useEffect(() => {
     if (!showLanguagePicker) {
       setHighlightedLanguageIndex(0);
       return;
@@ -101,11 +171,32 @@ export function Header() {
   }, [showLanguagePicker, filteredLanguages]);
 
   useEffect(() => {
+    if (!showGameModePicker) {
+      setHighlightedGameModeIndex(0);
+      return;
+    }
+
+    if (filteredGameModes.length === 0) {
+      setHighlightedGameModeIndex(0);
+      return;
+    }
+
+    setHighlightedGameModeIndex((prev) => Math.min(prev, filteredGameModes.length - 1));
+  }, [showGameModePicker, filteredGameModes]);
+
+  useEffect(() => {
     if (!showLanguagePicker) return;
 
-    const activeOption = optionRefs.current[highlightedLanguageIndex];
+    const activeOption = languageOptionRefs.current[highlightedLanguageIndex];
     activeOption?.scrollIntoView({ block: "nearest" });
   }, [highlightedLanguageIndex, showLanguagePicker]);
+
+  useEffect(() => {
+    if (!showGameModePicker) return;
+
+    const activeOption = gameModeOptionRefs.current[highlightedGameModeIndex];
+    activeOption?.scrollIntoView({ block: "nearest" });
+  }, [highlightedGameModeIndex, showGameModePicker]);
 
   useEffect(() => {
     if (!showAccountPanel) return;
@@ -225,8 +316,31 @@ export function Header() {
             </div>
           </Link>
 
-          {/* Centered language selector */}
+          {/* Centered game mode + language selector */}
           <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2">
+            <motion.button
+              onClick={() => setShowGameModePicker(true)}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl glass transition-all duration-300"
+              style={{
+                color: currentTheme.foreground,
+                textShadow: `0 0 8px ${currentTheme.primary}55`,
+              }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = currentTheme.primary;
+                e.currentTarget.style.textShadow = `0 0 14px ${currentTheme.primary}aa`;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = currentTheme.foreground;
+                e.currentTarget.style.textShadow = `0 0 8px ${currentTheme.primary}55`;
+              }}
+              title="select game mode"
+            >
+              <Type size={20} />
+              <span className="text-sm font-medium tracking-wide">{currentGameModeLabel}</span>
+            </motion.button>
+
             <motion.button
               onClick={() => setShowLanguagePicker(true)}
               className="flex items-center gap-2 px-3 py-2 rounded-xl glass transition-all duration-300"
@@ -438,7 +552,7 @@ export function Header() {
                   <button
                     key={key}
                     ref={(element) => {
-                      optionRefs.current[index] = element;
+                      languageOptionRefs.current[index] = element;
                     }}
                     className="w-full text-left px-4 py-2 transition-colors"
                     style={{ 
@@ -466,6 +580,84 @@ export function Header() {
               ) : (
                 <div className="px-4 py-6 text-sm" style={{ color: currentTheme.sub }}>
                   no languages found
+                </div>
+              )}
+            </div>
+          </motion.div>
+        </>
+      )}
+
+      {showGameModePicker && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            style={{ backgroundColor: `${currentTheme.background}cc` }}
+            onClick={() => setShowGameModePicker(false)}
+          />
+
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: -12 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ type: "spring", stiffness: 380, damping: 30 }}
+            className="fixed top-[18%] left-1/2 -translate-x-1/2 z-50 w-full max-w-lg rounded-2xl overflow-hidden"
+            style={{
+              backgroundColor: currentTheme.background,
+              border: `1px solid ${currentTheme.secondary}`,
+              boxShadow: `0 20px 60px ${currentTheme.background}cc`,
+            }}
+          >
+            <div
+              className="px-4 py-3 border-b"
+              style={{ borderColor: currentTheme.secondary }}
+            >
+              <input
+                type="text"
+                value={gameModeQuery}
+                onChange={(e) => setGameModeQuery(e.target.value)}
+                placeholder="type a game mode..."
+                autoFocus
+                className="w-full bg-transparent outline-none"
+                style={{ color: currentTheme.foreground }}
+              />
+            </div>
+
+            <div className="max-h-80 overflow-y-auto py-2">
+              {filteredGameModes.length > 0 ? (
+                filteredGameModes.map((modeOption, index) => (
+                  <button
+                    key={modeOption.key}
+                    ref={(element) => {
+                      gameModeOptionRefs.current[index] = element;
+                    }}
+                    className="w-full text-left px-4 py-2 transition-colors"
+                    style={{
+                      color: currentTheme.foreground,
+                      backgroundColor: index === highlightedGameModeIndex ? currentTheme.secondary : "transparent"
+                    }}
+                    onMouseEnter={(e) => {
+                      setHighlightedGameModeIndex(index);
+                      e.currentTarget.style.backgroundColor = currentTheme.secondary;
+                    }}
+                    onMouseLeave={(e) => {
+                      if (index !== highlightedGameModeIndex) {
+                        e.currentTarget.style.backgroundColor = "transparent";
+                      }
+                    }}
+                    onClick={() => {
+                      setGameMode(modeOption.key as "normal" | "spell-ladder");
+                      if (modeOption.key === "normal") {
+                        resetTest();
+                      }
+                      setShowGameModePicker(false);
+                      setGameModeQuery("");
+                    }}
+                  >
+                    {modeOption.label}
+                  </button>
+                ))
+              ) : (
+                <div className="px-4 py-6 text-sm" style={{ color: currentTheme.sub }}>
+                  no game modes found
                 </div>
               )}
             </div>

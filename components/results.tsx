@@ -326,7 +326,7 @@ export function Results() {
                 <span style={{ color: currentTheme.sub }}>/</span>
                 <span style={{ color: currentTheme.extra }}>{charBreakdown.extra}</span>
                 <span style={{ color: currentTheme.sub }}>/</span>
-                <span style={{ color: currentTheme.sub }}>{charBreakdown.missed}</span>
+                <span style={{ color: currentTheme.missing }}>{charBreakdown.missed}</span>
               </div>
 
               <div

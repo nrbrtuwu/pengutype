@@ -12,6 +12,7 @@ const modeIcons = {
 
 export function ModeSelector() {
   const {
+    gameMode,
     mode,
     setMode,
     timeOption,
@@ -32,7 +33,7 @@ export function ModeSelector() {
   const restartShortcutLabel = restartKeybind === "tab" ? "tab" : "tab + enter";
 
   // Hide during active test or when complete
-  if (isTestActive || isTestComplete) {
+  if (gameMode !== "normal" || isTestActive || isTestComplete) {
     return null;
   }
 

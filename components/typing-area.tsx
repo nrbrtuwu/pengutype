@@ -9,15 +9,25 @@ import { AnimatedCaret } from "./animated-caret";
 // Memoized character component to prevent unnecessary re-renders
 const Character = memo(function Character({ 
   char, 
-  color 
+  color,
+  isMissed,
+  missedUnderlineColor,
 }: { 
   char: string; 
   color: string;
+  isMissed?: boolean;
+  missedUnderlineColor?: string;
 }) {
   return (
     <span 
       data-char
-      style={{ color }}
+      style={{
+        color,
+        textDecorationLine: isMissed ? "underline" : "none",
+        textDecorationColor: isMissed ? (missedUnderlineColor ?? color) : undefined,
+        textUnderlineOffset: isMissed ? "0.22em" : undefined,
+        textDecorationThickness: isMissed ? "2px" : undefined,
+      }}
       className="transition-colors duration-75"
     >
       {char}
@@ -61,18 +71,28 @@ const Word = memo(function Word({
   const isWordComplete = wordIndex < currentWordIndex;
   const caretIndex = typedChars.length;
   const baseChars = word.split("");
+  const hasMissingChars = isWordComplete && typedChars.length < baseChars.length;
   const extraChars = typedChars.filter((c) => c.extra);
   const coreContent = baseChars.map((char, charIndex) => {
     const typedChar = typedChars[charIndex];
     let color = currentTheme.sub;
+    const shouldUnderlineWord = hasMissingChars;
 
     if (typedChar) {
       color = typedChar.correct ? currentTheme.correct : currentTheme.incorrect;
     } else if (isWordComplete) {
-      color = currentTheme.incorrect;
+      color = currentTheme.missing;
     }
 
-    return <Character key={`char-${charIndex}`} char={char} color={color} />;
+    return (
+      <Character
+        key={`char-${charIndex}`}
+        char={char}
+        color={color}
+        isMissed={shouldUnderlineWord}
+        missedUnderlineColor={currentTheme.incorrect}
+      />
+    );
   });
 
   if (isCurrentWord && caretIndex <= baseChars.length) {

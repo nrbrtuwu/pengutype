@@ -6,11 +6,14 @@ import { TypingArea } from "./typing-area";
 import { Timer } from "./timer";
 import { Results } from "./results";
 import { ModeSelector } from "./mode-selector";
+import { SpellingClimb } from "./spelling-climb";
+import { SpellLadderSelector } from "./spell-ladder-selector";
 import { Toaster, toast } from "sonner";
 import { themes } from "@/lib/themes";
 
 export function TypingTest() {
   const {
+    gameMode,
     mode,
     wordOption,
     language,
@@ -31,8 +34,12 @@ export function TypingTest() {
 
   // Generate words on mount and when settings change
   const generateWords = useCallback(() => {
+    if (gameMode !== "normal") {
+      return;
+    }
+
     resetTest();
-  }, [mode, wordOption, language, resetTest]);
+  }, [gameMode, mode, wordOption, language, resetTest]);
 
   const resetFromKeybind = useCallback(() => {
     if (suppressResultRecording && !isTestActive) {
@@ -49,6 +56,10 @@ export function TypingTest() {
 
   // Keyboard shortcuts for restart
   useEffect(() => {
+    if (gameMode !== "normal") {
+      return;
+    }
+
     let isTabDown = false;
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -113,6 +124,7 @@ export function TypingTest() {
     showSettings,
     showStatsPanel,
     showCommandPalette,
+    gameMode,
   ]);
 
   useEffect(() => {
@@ -148,11 +160,12 @@ export function TypingTest() {
       />
 
       {/* Vertical sidebar for mode selection */}
-      <ModeSelector />
+      {gameMode === "normal" && <ModeSelector />}
+      {gameMode === "spell-ladder" && <SpellLadderSelector />}
 
       {/* Main content area */}
       <div className="w-full max-w-4xl mx-auto">
-        {suppressResultRecording && !isTestComplete && (
+        {gameMode === "normal" && suppressResultRecording && !isTestComplete && (
           <div className="mb-4 text-center">
             <p
               className="text-sm sm:text-base font-bold tracking-wide italic"
@@ -175,14 +188,15 @@ export function TypingTest() {
           </div>
         )}
 
-        {/* Timer / Stats display during test */}
-        <Timer />
-
-        {/* Typing area */}
-        <TypingArea />
-
-        {/* Results after test */}
-        <Results />
+        {gameMode === "normal" ? (
+          <>
+            <Timer />
+            <TypingArea />
+            <Results />
+          </>
+        ) : (
+          <SpellingClimb />
+        )}
       </div>
     </div>
   );

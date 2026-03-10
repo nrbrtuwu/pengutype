@@ -6,6 +6,8 @@ import { ThemeKey } from './themes';
 import { calculateCharacterStats, calculatePerformanceStats, calculateSeparatorStats, validateTestAttempt } from './typing-metrics';
 
 export type TestMode = 'time' | 'words';
+export type GameMode = 'normal' | 'spell-ladder';
+export type SpellingRepeatMode = 'single' | 'infinite';
 export type TimeOption = 15 | 30 | 60 | 120;
 export type WordOption = 10 | 25 | 50 | 100;
 export type RestartKeybind = 'tab-enter' | 'tab';
@@ -31,6 +33,8 @@ export interface TestResult {
 
 interface TypingState {
   // Test settings
+  gameMode: GameMode;
+  spellingRepeatMode: SpellingRepeatMode;
   mode: TestMode;
   timeOption: TimeOption;
   wordOption: WordOption;
@@ -75,6 +79,8 @@ interface TypingState {
   invalidationNotice: { id: number; reason: string } | null;
   
   // Actions
+  setGameMode: (mode: GameMode) => void;
+  setSpellingRepeatMode: (mode: SpellingRepeatMode) => void;
   setMode: (mode: TestMode) => void;
   setTimeOption: (time: TimeOption) => void;
   setWordOption: (words: WordOption) => void;
@@ -102,6 +108,7 @@ interface TypingState {
   mergeResults: (incomingResults: TestResult[]) => void;
   addResult: (result: TestResult) => void;
   clearHistory: () => void;
+  setInvalidationNotice: (reason: string) => void;
   clearInvalidationNotice: () => void;
 }
 
@@ -129,6 +136,8 @@ export const useTypingStore = create<TypingState>()(
   persist(
     (set, get) => ({
       // Default settings
+      gameMode: 'normal',
+      spellingRepeatMode: 'infinite',
       mode: 'time',
       timeOption: 30,
       wordOption: 25,
@@ -173,6 +182,8 @@ export const useTypingStore = create<TypingState>()(
       invalidationNotice: null,
       
       // Actions
+      setGameMode: (gameMode) => set({ gameMode }),
+      setSpellingRepeatMode: (spellingRepeatMode) => set({ spellingRepeatMode }),
       setMode: (mode) => set({ mode }),
       setTimeOption: (timeOption) => set({ timeOption, timeLeft: timeOption }),
       setWordOption: (wordOption) => set({ wordOption }),
@@ -483,11 +494,14 @@ export const useTypingStore = create<TypingState>()(
         }),
       addResult: (result) => set({ results: [...get().results, result] }),
       clearHistory: () => set({ results: [] }),
+      setInvalidationNotice: (reason) => set({ invalidationNotice: { id: Date.now(), reason } }),
       clearInvalidationNotice: () => set({ invalidationNotice: null })
     }),
     {
       name: 'pengutype-storage',
       partialize: (state) => ({
+        gameMode: state.gameMode,
+        spellingRepeatMode: state.spellingRepeatMode,
         mode: state.mode,
         timeOption: state.timeOption,
         wordOption: state.wordOption,
@@ -501,6 +515,9 @@ export const useTypingStore = create<TypingState>()(
       }),
       onRehydrateStorage: () => (state, error) => {
         if (!error) {
+          if ((state as { gameMode?: string } | undefined)?.gameMode === 'spell-climb') {
+            state?.setGameMode('spell-ladder');
+          }
           state?.setHasHydrated(true);
         }
       }

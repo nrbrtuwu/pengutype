@@ -7,11 +7,16 @@ export interface Theme {
   correct: string;
   incorrect: string;
   extra: string;
+  missing: string;
   caret: string;
   sub: string;
 }
 
-export const themes: Record<string, Theme> = {
+const INCORRECT_COLOR = "#bf616a";
+const EXTRA_COLOR = "#d08770";
+const MISSING_COLOR = "#4c566a";
+
+const baseThemes: Record<string, Omit<Theme, "incorrect" | "extra" | "missing">> = {
   // Default vibrant theme
   aurora: {
     name: "Aurora",
@@ -20,8 +25,6 @@ export const themes: Record<string, Theme> = {
     primary: "#c879ff",
     secondary: "#15152a",
     correct: "#e8e6f0",
-    incorrect: "#ff6b8a",
-    extra: "#ff4d6d",
     caret: "#c879ff",
     sub: "#4a4a6a"
   },
@@ -32,8 +35,6 @@ export const themes: Record<string, Theme> = {
     primary: "#00ffcc",
     secondary: "#1a1a33",
     correct: "#00ffcc",
-    incorrect: "#ff0066",
-    extra: "#ff3385",
     caret: "#00ffcc",
     sub: "#336666"
   },
@@ -44,8 +45,6 @@ export const themes: Record<string, Theme> = {
     primary: "#ff7b54",
     secondary: "#2a1525",
     correct: "#ffeedd",
-    incorrect: "#ff3366",
-    extra: "#cc2952",
     caret: "#ff7b54",
     sub: "#665555"
   },
@@ -56,8 +55,6 @@ export const themes: Record<string, Theme> = {
     primary: "#4fc3f7",
     secondary: "#102535",
     correct: "#c5e4f3",
-    incorrect: "#ff5252",
-    extra: "#cc4141",
     caret: "#4fc3f7",
     sub: "#4a6070"
   },
@@ -68,8 +65,6 @@ export const themes: Record<string, Theme> = {
     primary: "#7dcea0",
     secondary: "#122518",
     correct: "#d4e5d7",
-    incorrect: "#e57373",
-    extra: "#c55a5a",
     caret: "#7dcea0",
     sub: "#4a6050"
   },
@@ -80,8 +75,6 @@ export const themes: Record<string, Theme> = {
     primary: "#e2b714",
     secondary: "#2c2e31",
     correct: "#d1d0c5",
-    incorrect: "#ca4754",
-    extra: "#7e2a33",
     caret: "#e2b714",
     sub: "#646669"
   },
@@ -92,8 +85,6 @@ export const themes: Record<string, Theme> = {
     primary: "#bd93f9",
     secondary: "#44475a",
     correct: "#f8f8f2",
-    incorrect: "#ff5555",
-    extra: "#ff79c6",
     caret: "#bd93f9",
     sub: "#6272a4"
   },
@@ -104,8 +95,6 @@ export const themes: Record<string, Theme> = {
     primary: "#f92672",
     secondary: "#3e3d32",
     correct: "#f8f8f2",
-    incorrect: "#f92672",
-    extra: "#fd971f",
     caret: "#f92672",
     sub: "#75715e"
   },
@@ -116,8 +105,6 @@ export const themes: Record<string, Theme> = {
     primary: "#88c0d0",
     secondary: "#3b4252",
     correct: "#eceff4",
-    incorrect: "#bf616a",
-    extra: "#d08770",
     caret: "#88c0d0",
     sub: "#4c566a"
   },
@@ -128,8 +115,6 @@ export const themes: Record<string, Theme> = {
     primary: "#ff7edb",
     secondary: "#2a1840",
     correct: "#f0e9e2",
-    incorrect: "#fe4450",
-    extra: "#fede5d",
     caret: "#ff7edb",
     sub: "#72639a"
   },
@@ -140,8 +125,6 @@ export const themes: Record<string, Theme> = {
     primary: "#7aa2f7",
     secondary: "#24283b",
     correct: "#a9b1d6",
-    incorrect: "#f7768e",
-    extra: "#ff9e64",
     caret: "#7aa2f7",
     sub: "#565f89"
   },
@@ -152,8 +135,6 @@ export const themes: Record<string, Theme> = {
     primary: "#cba6f7",
     secondary: "#313244",
     correct: "#cdd6f4",
-    incorrect: "#f38ba8",
-    extra: "#fab387",
     caret: "#cba6f7",
     sub: "#6c7086"
   },
@@ -164,8 +145,6 @@ export const themes: Record<string, Theme> = {
     primary: "#00d9ff",
     secondary: "#1a1a2e",
     correct: "#e0e0e0",
-    incorrect: "#ff4757",
-    extra: "#ffa502",
     caret: "#00d9ff",
     sub: "#5c5c7a"
   },
@@ -176,8 +155,6 @@ export const themes: Record<string, Theme> = {
     primary: "#00ff41",
     secondary: "#003b00",
     correct: "#00ff41",
-    incorrect: "#ff0040",
-    extra: "#008f11",
     caret: "#00ff41",
     sub: "#008f11"
   },
@@ -188,8 +165,6 @@ export const themes: Record<string, Theme> = {
     primary: "#eb6f92",
     secondary: "#26233a",
     correct: "#e0def4",
-    incorrect: "#eb6f92",
-    extra: "#f6c177",
     caret: "#eb6f92",
     sub: "#6e6a86"
   },
@@ -200,11 +175,21 @@ export const themes: Record<string, Theme> = {
     primary: "#fabd2f",
     secondary: "#3c3836",
     correct: "#ebdbb2",
-    incorrect: "#fb4934",
-    extra: "#fe8019",
     caret: "#fabd2f",
     sub: "#665c54"
   }
 };
+
+export const themes: Record<string, Theme> = Object.fromEntries(
+  Object.entries(baseThemes).map(([key, baseTheme]) => [
+    key,
+    {
+      ...baseTheme,
+      incorrect: INCORRECT_COLOR,
+      extra: EXTRA_COLOR,
+      missing: MISSING_COLOR,
+    },
+  ])
+) as Record<string, Theme>;
 
 export type ThemeKey = keyof typeof themes;
