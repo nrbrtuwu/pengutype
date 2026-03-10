@@ -121,3 +121,14 @@
   --y: translateX(110%);
   opacity: 0;
 }
+
+.pengu-toast[data-sonner-toast][data-type="error"] {
+  background: #7f0000 !important;
+  border-color: #c91c1c !important;
+  box-shadow: 0 0 18px #b4121266 !important;
+}
+
+.pengu-toast[data-sonner-toast][data-type="error"] [data-title],
+.pengu-toast[data-sonner-toast][data-type="error"] [data-description] {
+  color: #ffd6d6 !important;
+}

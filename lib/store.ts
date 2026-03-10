@@ -84,6 +84,7 @@ interface TypingState {
   startTest: () => void;
   endTest: () => void;
   resetTest: () => void;
+  exitRetryMode: () => void;
   retryCurrentTest: () => void;
   handleKeyPress: (key: string) => void;
   updateTimeLeft: (time: number) => void;
@@ -247,11 +248,40 @@ export const useTypingStore = create<TypingState>()(
           missedChars: characterStats.missedChars,
           currentResult: result,
           results: shouldRecordResult ? [...state.results, result] : state.results,
+          suppressResultRecording: false,
           invalidationNotice: nextInvalidationNotice
         });
       },
       
       resetTest: () => {
+        const state = get();
+        const count = state.mode === 'time' ? 200 : state.wordOption;
+        const words = state.suppressResultRecording && state.words.length > 0
+          ? state.words
+          : getRandomWords(state.language, count);
+
+        set({
+          isTestActive: false,
+          isTestComplete: false,
+          currentWordIndex: 0,
+          currentCharIndex: 0,
+          words,
+          typedWords: [],
+          typedChars: words.map(() => []),
+          startTime: null,
+          endTime: null,
+          timeLeft: state.timeOption,
+          correctChars: 0,
+          incorrectChars: 0,
+          extraChars: 0,
+          missedChars: 0,
+          currentResult: null,
+          suppressResultRecording: state.suppressResultRecording,
+          invalidationNotice: null
+        });
+      },
+
+      exitRetryMode: () => {
         const state = get();
         const count = state.mode === 'time' ? 200 : state.wordOption;
         const words = getRandomWords(state.language, count);

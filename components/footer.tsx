@@ -55,7 +55,7 @@ export function Footer() {
               className="px-2 py-1 rounded-lg font-mono font-bold"
               style={{ backgroundColor: currentTheme.secondary, color: currentTheme.foreground }}
             >
-              esc
+              ctrl+p
             </kbd>
             <span className="ml-1">settings</span>
           </div>

@@ -5,6 +5,7 @@ import { useTypingStore } from "@/lib/store";
 import { themes } from "@/lib/themes";
 import { calculateCharacterStats, calculatePerformanceStats, calculateSeparatorStats } from "@/lib/typing-metrics";
 import { Zap, Target, Clock } from "lucide-react";
+import { motion } from "framer-motion";
 
 export function Timer() {
   const {
@@ -79,7 +80,12 @@ export function Timer() {
   if (!isTestActive || isTestComplete) return null;
 
   return (
-    <div className="mb-8">
+    <motion.div
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+      className="mb-8"
+    >
       {/* Progress bar for time mode */}
       {mode === "time" && (
         <div 
@@ -162,6 +168,6 @@ export function Timer() {
           </span>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

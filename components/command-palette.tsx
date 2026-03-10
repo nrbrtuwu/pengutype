@@ -141,7 +141,7 @@ export function CommandPalette() {
         toggleSettings();
         toggleCommandPalette();
       },
-      shortcut: "esc"
+      shortcut: "ctrl + p"
     });
     cmds.push({
       id: "stats",
@@ -217,14 +217,15 @@ export function CommandPalette() {
         e.preventDefault();
         toggleCommandPalette();
       }
-      if (e.key === "Escape" && !showCommandPalette) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "p") {
+        e.preventDefault();
         toggleSettings();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [toggleCommandPalette, showCommandPalette, toggleSettings]);
+  }, [toggleCommandPalette, toggleSettings]);
 
   // Group commands by category
   const groupedCommands = useMemo(() => {

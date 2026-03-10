@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useTypingStore } from "@/lib/store";
 import { themes, ThemeKey } from "@/lib/themes";
 import { languages, LanguageKey, getLanguageDisplayName } from "@/lib/words";
@@ -32,6 +33,20 @@ export function SettingsPanel() {
     { key: "tab-enter", label: "tab + enter" },
     { key: "tab", label: "tab" }
   ];
+
+  useEffect(() => {
+    if (!showSettings) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setShowSettings(false);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [showSettings, setShowSettings]);
 
   if (!showSettings) {
     return null;
