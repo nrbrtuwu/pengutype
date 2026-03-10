@@ -129,7 +129,7 @@ export function SpellLadderSelector() {
         }}
       >
         <button
-          onClick={() => window.dispatchEvent(new CustomEvent("spell-ladder-reset"))}
+          onClick={() => window.dispatchEvent(new CustomEvent("spell-ladder-request-reset"))}
           className="flex items-center justify-center w-10 h-10 rounded-lg transition-all duration-200 hover:scale-105 hover:rotate-[-30deg]"
           style={{ color: currentTheme.sub }}
           title={`restart (${restartShortcutLabel})`}

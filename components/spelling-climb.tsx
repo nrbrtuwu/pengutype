@@ -88,9 +88,9 @@ export function SpellingClimb() {
       buildRound();
     };
 
-    window.addEventListener("spell-ladder-reset", handleSpellReset as EventListener);
+    window.addEventListener("spell-ladder-request-reset", handleSpellReset as EventListener);
     return () => {
-      window.removeEventListener("spell-ladder-reset", handleSpellReset as EventListener);
+      window.removeEventListener("spell-ladder-request-reset", handleSpellReset as EventListener);
     };
   }, [buildRound]);
 
