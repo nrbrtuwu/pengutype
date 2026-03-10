@@ -28,6 +28,7 @@ export function SpellingClimb() {
   const wordFontSize = Math.max(42, Math.round(fontSize * 3));
 
   const [wordChain, setWordChain] = useState<string[]>([]);
+  const [queuedChain, setQueuedChain] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [typed, setTyped] = useState("");
   const [timeLeft, setTimeLeft] = useState(ROUND_SECONDS);
@@ -41,9 +42,28 @@ export function SpellingClimb() {
   const [correctChars, setCorrectChars] = useState(0);
   const [incorrectChars, setIncorrectChars] = useState(0);
 
+  const generateChain = useCallback((excludeSignature?: string) => {
+    const fallback = ["bee", "need", "needle", "needles"];
+
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const candidate = getSpellingChain(language, 3);
+      const chain = candidate.length > 0 ? candidate : fallback;
+      const signature = chain.join("|");
+
+      if (!excludeSignature || signature !== excludeSignature) {
+        return chain;
+      }
+    }
+
+    return fallback;
+  }, [language]);
+
   const buildRound = useCallback(() => {
-    const chain = getSpellingChain(language, 3);
-    setWordChain(chain.length > 0 ? chain : ["bee", "need", "needle", "needles"]);
+    const chain = generateChain();
+    const nextChain = generateChain(chain.join("|"));
+
+    setWordChain(chain);
+    setQueuedChain(nextChain);
     setCurrentIndex(0);
     setTyped("");
     setTimeLeft(timeOption);
@@ -57,7 +77,7 @@ export function SpellingClimb() {
     setCorrectChars(0);
     setIncorrectChars(0);
     window.dispatchEvent(new CustomEvent("spell-ladder-reset"));
-  }, [language, timeOption]);
+  }, [generateChain, timeOption]);
 
   useEffect(() => {
     buildRound();
@@ -118,7 +138,7 @@ export function SpellingClimb() {
     currentIndex + 1 < wordChain.length
       ? wordChain[currentIndex + 1]
       : spellingRepeatMode === "infinite"
-        ? wordChain[0] ?? ""
+        ? queuedChain[0] ?? ""
         : "";
   const hasNextWord = nextWord.length > 0;
 
@@ -293,6 +313,11 @@ export function SpellingClimb() {
           setIsActive(false);
           setCompletedAt(Date.now());
         } else {
+          const nextChain = queuedChain.length > 0 ? queuedChain : generateChain(wordChain.join("|"));
+          const followingChain = generateChain(nextChain.join("|"));
+
+          setWordChain(nextChain);
+          setQueuedChain(followingChain);
           setCurrentIndex(0);
           setTyped("");
         }
@@ -327,6 +352,9 @@ export function SpellingClimb() {
     restartKeybind,
     spellingRepeatMode,
     typed,
+    queuedChain,
+    generateChain,
+    wordChain,
     wordChain.length,
   ]);
 
