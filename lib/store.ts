@@ -32,6 +32,17 @@ export interface TestResult {
   timestamp: number;
 }
 
+export interface SpellLadderResult {
+  repeatMode: SpellingRepeatMode;
+  language: LanguageKey;
+  timeOption: TimeOption;
+  completedWords: number;
+  elapsedSeconds: number;
+  isCompleted: boolean;
+  isValid: boolean;
+  timestamp: number;
+}
+
 interface TypingState {
   // Test settings
   gameMode: GameMode;
@@ -62,6 +73,7 @@ interface TypingState {
   
   // History
   results: TestResult[];
+  spellLadderResults: SpellLadderResult[];
   currentResult: TestResult | null;
   
   // UI
@@ -108,6 +120,7 @@ interface TypingState {
   setHasHydrated: (hasHydrated: boolean) => void;
   mergeResults: (incomingResults: TestResult[]) => void;
   addResult: (result: TestResult) => void;
+  addSpellLadderResult: (result: SpellLadderResult) => void;
   clearHistory: () => void;
   setInvalidationNotice: (reason: string) => void;
   clearInvalidationNotice: () => void;
@@ -165,6 +178,7 @@ export const useTypingStore = create<TypingState>()(
       
       // History
       results: [],
+      spellLadderResults: [],
       currentResult: null,
       
       // UI
@@ -494,7 +508,8 @@ export const useTypingStore = create<TypingState>()(
           return { results: merged };
         }),
       addResult: (result) => set({ results: [...get().results, result] }),
-      clearHistory: () => set({ results: [] }),
+      addSpellLadderResult: (result) => set({ spellLadderResults: [...get().spellLadderResults, result] }),
+      clearHistory: () => set({ results: [], spellLadderResults: [] }),
       setInvalidationNotice: (reason) => set({ invalidationNotice: { id: Date.now(), reason } }),
       clearInvalidationNotice: () => set({ invalidationNotice: null })
     }),
@@ -538,7 +553,8 @@ export const useTypingStore = create<TypingState>()(
         caretStyle: state.caretStyle,
         fontSize: state.fontSize,
         restartKeybind: state.restartKeybind,
-        results: state.results
+        results: state.results,
+        spellLadderResults: state.spellLadderResults
       }),
       onRehydrateStorage: () => (state, error) => {
         if (!error) {

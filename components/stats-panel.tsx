@@ -15,9 +15,11 @@ type BucketCell = {
 
 export function StatsPanel() {
   const {
+    gameMode,
     showStatsPanel,
     setShowStatsPanel,
     results,
+    spellLadderResults,
     language,
     theme,
     clearHistory
@@ -25,15 +27,21 @@ export function StatsPanel() {
 
   const currentTheme = themes[theme];
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageKey>(language);
+  const [selectedGameMode, setSelectedGameMode] = useState<"normal" | "spell-ladder">(gameMode);
 
   const timeOptions = [15, 30, 60, 120] as const;
   const wordOptions = [10, 25, 50, 100] as const;
+  const gameModeOptions: { key: "normal" | "spell-ladder"; label: string }[] = [
+    { key: "normal", label: "normal" },
+    { key: "spell-ladder", label: "spell ladder" },
+  ];
 
   useEffect(() => {
     if (showStatsPanel) {
       setSelectedLanguage(language);
+      setSelectedGameMode(gameMode);
     }
-  }, [showStatsPanel, language]);
+  }, [showStatsPanel, language, gameMode]);
 
   useEffect(() => {
     if (!showStatsPanel) return;
@@ -49,7 +57,12 @@ export function StatsPanel() {
   }, [showStatsPanel, setShowStatsPanel]);
 
   const availableLanguages = useMemo(() => {
-    const languagesWithResults = Array.from(new Set(results.map((result) => result.language))) as LanguageKey[];
+    const languagesWithResults = Array.from(
+      new Set([
+        ...results.map((result) => result.language),
+        ...spellLadderResults.map((result) => result.language),
+      ])
+    ) as LanguageKey[];
 
     if (languagesWithResults.length === 0) {
       return [language];
@@ -60,7 +73,7 @@ export function StatsPanel() {
     }
 
     return languagesWithResults;
-  }, [results, language]);
+  }, [results, spellLadderResults, language]);
 
   useEffect(() => {
     if (availableLanguages.length === 0) return;
@@ -149,6 +162,48 @@ export function StatsPanel() {
     );
   };
 
+  const singleSpellStats = useMemo(() => {
+    const singleCompletedRuns = spellLadderResults.filter(
+      (result) =>
+        result.language === selectedLanguage &&
+        result.repeatMode === "single" &&
+        result.isCompleted &&
+        result.isValid
+    );
+
+    if (singleCompletedRuns.length === 0) {
+      return null;
+    }
+
+    const fastestTime = Math.min(...singleCompletedRuns.map((result) => result.elapsedSeconds));
+
+    return {
+      fastestTime,
+      tests: singleCompletedRuns.length,
+    };
+  }, [selectedLanguage, spellLadderResults]);
+
+  const infiniteSpellStatsByLimit = useMemo(() => {
+    const map = new Map<number, { bestWords: number; tests: number }>();
+
+    spellLadderResults.forEach((result) => {
+      if (result.language !== selectedLanguage || result.repeatMode !== "infinite" || !result.isValid) {
+        return;
+      }
+
+      const existing = map.get(result.timeOption);
+      if (!existing) {
+        map.set(result.timeOption, { bestWords: result.completedWords, tests: 1 });
+        return;
+      }
+
+      existing.tests += 1;
+      existing.bestWords = Math.max(existing.bestWords, result.completedWords);
+    });
+
+    return map;
+  }, [selectedLanguage, spellLadderResults]);
+
   return (
     <AnimatePresence>
       {showStatsPanel && (
@@ -221,13 +276,92 @@ export function StatsPanel() {
                 })}
               </div>
 
-              <section className="mb-5">
-                {renderModeCard("time")}
-              </section>
+              <div className="flex flex-wrap gap-2 mb-6">
+                {gameModeOptions.map((modeOption) => {
+                  const active = selectedGameMode === modeOption.key;
+                  return (
+                    <button
+                      key={modeOption.key}
+                      onClick={() => setSelectedGameMode(modeOption.key)}
+                      className="px-3 py-1.5 rounded-lg text-sm transition-all"
+                      style={{
+                        color: active ? currentTheme.background : currentTheme.foreground,
+                        backgroundColor: active ? currentTheme.primary : `${currentTheme.sub}22`
+                      }}
+                    >
+                      {modeOption.label}
+                    </button>
+                  );
+                })}
+              </div>
 
-              <section>
-                {renderModeCard("words")}
-              </section>
+              {selectedGameMode === "normal" ? (
+                <>
+                  <section className="mb-5">
+                    {renderModeCard("time")}
+                  </section>
+
+                  <section>
+                    {renderModeCard("words")}
+                  </section>
+                </>
+              ) : (
+                <>
+                  <section>
+                    <div
+                      className="rounded-2xl p-5"
+                      style={{
+                        backgroundColor: `${currentTheme.background}aa`,
+                        border: `1px solid ${currentTheme.sub}22`
+                      }}
+                    >
+                      <div className="text-xs mb-2 tracking-wider" style={{ color: currentTheme.sub }}>
+                        spell ladder • single repeat
+                      </div>
+                      <div className="text-5xl font-mono leading-none" style={{ color: currentTheme.foreground }}>
+                        {singleSpellStats ? `${singleSpellStats.fastestTime.toFixed(2)}s` : "--"}
+                      </div>
+                      <div className="text-xs mt-2" style={{ color: currentTheme.sub }}>
+                        fastest completed time (all time limits) {singleSpellStats ? `• ${singleSpellStats.tests} test${singleSpellStats.tests > 1 ? "s" : ""}` : "• no tests"}
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="mt-5">
+                    <div
+                      className="rounded-2xl p-5"
+                      style={{
+                        backgroundColor: `${currentTheme.background}aa`,
+                        border: `1px solid ${currentTheme.sub}22`
+                      }}
+                    >
+                      <div className="text-xs mb-4 tracking-wider" style={{ color: currentTheme.sub }}>
+                        spell ladder • infinite repeat
+                      </div>
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {timeOptions.map((option) => {
+                          const stat = infiniteSpellStatsByLimit.get(option);
+
+                          return (
+                            <div key={`spell-infinite-${option}`} className="px-2 py-1">
+                              <div className="text-xs mb-2" style={{ color: currentTheme.sub }}>
+                                {option} seconds
+                              </div>
+                              <div className="text-5xl font-mono leading-none" style={{ color: currentTheme.foreground }}>
+                                {stat ? stat.bestWords : "--"}
+                              </div>
+                              <div className="text-xs mt-1" style={{ color: currentTheme.sub }}>
+                                {stat ? `${stat.tests} test${stat.tests > 1 ? "s" : ""}` : "no tests"}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </section>
+                </>
+              )}
             </div>
           </motion.div>
         </>

@@ -8,6 +8,7 @@ import { themes } from "@/lib/themes";
 import { getSpellingChain } from "@/lib/words";
 import { useCaretPosition } from "@/hooks/use-caret-position";
 import { AnimatedCaret } from "./animated-caret";
+import { createPortal } from "react-dom";
 
 const ROUND_SECONDS = 60;
 
@@ -22,6 +23,8 @@ export function SpellingClimb() {
     timeOption,
     spellingRepeatMode,
     setInvalidationNotice,
+    addSpellLadderResult,
+    spellLadderResults,
   } = useTypingStore();
   const currentTheme = themes[theme];
   const wordsRef = useRef<HTMLDivElement>(null);
@@ -41,6 +44,10 @@ export function SpellingClimb() {
   const [completedWords, setCompletedWords] = useState(0);
   const [correctChars, setCorrectChars] = useState(0);
   const [incorrectChars, setIncorrectChars] = useState(0);
+  const [singleRunCompleted, setSingleRunCompleted] = useState(false);
+  const [isRoundNewBest, setIsRoundNewBest] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const hasRecordedResultRef = useRef(false);
 
   const generateChain = useCallback((excludeSignature?: string) => {
     const fallback = ["bee", "need", "needle", "needles"];
@@ -76,8 +83,88 @@ export function SpellingClimb() {
     setCompletedWords(0);
     setCorrectChars(0);
     setIncorrectChars(0);
+    setSingleRunCompleted(false);
+    setIsRoundNewBest(false);
+    setShowConfetti(false);
+    hasRecordedResultRef.current = false;
     window.dispatchEvent(new CustomEvent("spell-ladder-reset"));
   }, [generateChain, timeOption]);
+
+  useEffect(() => {
+    if (!isComplete || hasRecordedResultRef.current || !startedAt) {
+      return;
+    }
+
+    const completedTs = completedAt ?? Date.now();
+    const elapsedSeconds = Math.max(0.001, (completedTs - startedAt) / 1000);
+    const isValidRun = !isInvalidated;
+    let shouldCelebrate = false;
+
+    if (spellingRepeatMode === "single") {
+      if (singleRunCompleted && isValidRun) {
+        const previousFastestTime = spellLadderResults
+          .filter(
+            (result) =>
+              result.language === language &&
+              result.repeatMode === "single" &&
+              result.isCompleted &&
+              result.isValid
+          )
+          .reduce((best, result) => Math.min(best, result.elapsedSeconds), Number.POSITIVE_INFINITY);
+
+        shouldCelebrate = elapsedSeconds < previousFastestTime;
+
+        addSpellLadderResult({
+          repeatMode: "single",
+          language,
+          timeOption,
+          completedWords,
+          elapsedSeconds,
+          isCompleted: true,
+          isValid: true,
+          timestamp: completedTs,
+        });
+      }
+    } else if (isValidRun) {
+      const previousBestWords = spellLadderResults
+        .filter(
+          (result) =>
+            result.language === language &&
+            result.repeatMode === "infinite" &&
+            result.isValid &&
+            result.timeOption === timeOption
+        )
+        .reduce((best, result) => Math.max(best, result.completedWords), -1);
+
+      shouldCelebrate = completedWords > previousBestWords;
+
+      addSpellLadderResult({
+        repeatMode: "infinite",
+        language,
+        timeOption,
+        completedWords,
+        elapsedSeconds,
+        isCompleted: false,
+        isValid: true,
+        timestamp: completedTs,
+      });
+    }
+
+    setIsRoundNewBest(shouldCelebrate);
+    hasRecordedResultRef.current = true;
+  }, [
+    addSpellLadderResult,
+    completedAt,
+    completedWords,
+    isComplete,
+    isInvalidated,
+    language,
+    spellLadderResults,
+    singleRunCompleted,
+    spellingRepeatMode,
+    startedAt,
+    timeOption,
+  ]);
 
   useEffect(() => {
     buildRound();
@@ -309,6 +396,7 @@ export function SpellingClimb() {
         setTyped("");
       } else {
         if (spellingRepeatMode === "single") {
+          setSingleRunCompleted(true);
           setIsComplete(true);
           setIsActive(false);
           setCompletedAt(Date.now());
@@ -383,8 +471,77 @@ export function SpellingClimb() {
     : Math.max(0, Math.round((correctChars / 5) / (elapsedSecondsPrecise / 60)));
   const timeDisplay = isSingleRepeatMode ? `${elapsedSecondsPrecise.toFixed(2)}s` : `${elapsedSeconds}s`;
 
+  const isNewBest = isRoundNewBest;
+
+  const confettiPieces = useMemo(
+    () =>
+      Array.from({ length: 90 }, (_, index) => ({
+        id: index,
+        x: Math.random() * 100,
+        drift: (Math.random() - 0.5) * 320,
+        rotate: (Math.random() - 0.5) * 720,
+        size: 5 + Math.random() * 8,
+        delay: Math.random() * 0.45,
+        duration: 1.2 + Math.random() * 1.2,
+      })),
+    [completedAt, isRoundNewBest]
+  );
+
+  useEffect(() => {
+    if (!isNewBest) {
+      setShowConfetti(false);
+      return;
+    }
+
+    setShowConfetti(true);
+    const timer = window.setTimeout(() => setShowConfetti(false), 1800);
+    return () => window.clearTimeout(timer);
+  }, [isNewBest, completedAt]);
+
   return (
     <div className="w-full max-w-4xl mx-auto">
+      {typeof document !== "undefined" &&
+        createPortal(
+          <AnimatePresence>
+            {showConfetti && (
+              <div className="fixed inset-0 pointer-events-none z-[120] overflow-hidden">
+                {confettiPieces.map((piece) => (
+                  <motion.div
+                    key={piece.id}
+                    className="absolute rounded-[2px]"
+                    style={{
+                      left: `${piece.x}%`,
+                      top: "-10vh",
+                      width: piece.size,
+                      height: piece.size * 0.65,
+                      backgroundColor:
+                        piece.id % 3 === 0
+                          ? currentTheme.primary
+                          : piece.id % 3 === 1
+                            ? currentTheme.caret
+                            : currentTheme.foreground,
+                    }}
+                    initial={{ y: 0, x: 0, rotate: 0, opacity: 0 }}
+                    animate={{
+                      y: "120vh",
+                      x: piece.drift,
+                      rotate: piece.rotate,
+                      opacity: [0, 1, 1, 0],
+                    }}
+                    exit={{ opacity: 0 }}
+                    transition={{
+                      duration: piece.duration,
+                      delay: piece.delay,
+                      ease: "easeOut",
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </AnimatePresence>,
+          document.body
+        )}
+
       {!isComplete && (
         <div className="mb-8 h-[56px] flex items-center justify-center" aria-hidden={!isActive}>
           {isActive && (
@@ -437,6 +594,25 @@ export function SpellingClimb() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             className="w-full"
           >
+            {isNewBest && (
+              <motion.div
+                initial={{ opacity: 0, y: 10, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                className="mb-4 text-center"
+              >
+                <span
+                  className="inline-flex items-center px-4 py-2 rounded-full text-sm font-bold tracking-wide"
+                  style={{
+                    background: `linear-gradient(135deg, ${currentTheme.primary}33, ${currentTheme.caret}33)`,
+                    color: currentTheme.foreground,
+                    boxShadow: `0 0 24px ${currentTheme.primary}33`,
+                  }}
+                >
+                  🎉 new best!
+                </span>
+              </motion.div>
+            )}
+
             <div className={`grid grid-cols-2 ${isSingleRepeatMode ? "md:grid-cols-4" : "md:grid-cols-3"} gap-4 mb-8`}>
               {isSingleRepeatMode && (
                 <div className="text-center p-6 rounded-2xl" style={{ backgroundColor: `${currentTheme.background}dd` }}>
