@@ -271,6 +271,15 @@ export function Header() {
     ? new Date(cloudLastSyncedAt).toLocaleString()
     : "never";
 
+  const handleLogoReset = () => {
+    if (gameMode === "spell-ladder") {
+      window.dispatchEvent(new CustomEvent("spell-ladder-request-reset"));
+      return;
+    }
+
+    resetTest();
+  };
+
   return (
     <>
       <motion.header
@@ -286,7 +295,7 @@ export function Header() {
             className="flex items-center gap-4 group"
             onClick={(event) => {
               event.preventDefault();
-              resetTest();
+              handleLogoReset();
             }}
           >
             <motion.div

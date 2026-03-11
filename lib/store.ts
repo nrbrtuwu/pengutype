@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { getRandomWords } from '@/lib/words';
+import { languages } from '@/languages';
 import type { LanguageKey } from '@/languages';
 import { ThemeKey } from './themes';
 import { calculateCharacterStats, calculatePerformanceStats, calculateSeparatorStats, validateTestAttempt } from './typing-metrics';
@@ -515,6 +516,10 @@ export const useTypingStore = create<TypingState>()(
       }),
       onRehydrateStorage: () => (state, error) => {
         if (!error) {
+          const languageKey = state?.language;
+          if (languageKey && !(languageKey in languages)) {
+            state?.setLanguage('english');
+          }
           if ((state as { gameMode?: string } | undefined)?.gameMode === 'spell-climb') {
             state?.setGameMode('spell-ladder');
           }
