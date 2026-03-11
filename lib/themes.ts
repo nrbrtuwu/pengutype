@@ -148,16 +148,6 @@ const baseThemes: Record<string, Omit<Theme, "incorrect" | "extra" | "missing">>
     caret: "#00d9ff",
     sub: "#5c5c7a"
   },
-  matrix: {
-    name: "Matrix",
-    background: "#0d0208",
-    foreground: "#00ff41",
-    primary: "#00ff41",
-    secondary: "#003b00",
-    correct: "#00ff41",
-    caret: "#00ff41",
-    sub: "#008f11"
-  },
   rose_pine: {
     name: "Rose Pine",
     background: "#191724",
@@ -167,16 +157,6 @@ const baseThemes: Record<string, Omit<Theme, "incorrect" | "extra" | "missing">>
     correct: "#e0def4",
     caret: "#eb6f92",
     sub: "#6e6a86"
-  },
-  gruvbox: {
-    name: "Gruvbox",
-    background: "#282828",
-    foreground: "#ebdbb2",
-    primary: "#fabd2f",
-    secondary: "#3c3836",
-    correct: "#ebdbb2",
-    caret: "#fabd2f",
-    sub: "#665c54"
   }
 };
 

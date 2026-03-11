@@ -5,7 +5,7 @@ import { useTypingStore } from "@/lib/store";
 import { themes } from "@/lib/themes";
 import { languages, getLanguageDisplayName, LanguageKey } from "@/lib/words";
 import { motion } from "framer-motion";
-import { Settings, BarChart3, Languages, CircleUser, Type } from "lucide-react";
+import { Settings, BarChart3, Languages, CircleUser, Gamepad2 } from "lucide-react";
 import { signIn, signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 
@@ -346,7 +346,7 @@ export function Header() {
               }}
               title="select game mode"
             >
-              <Type size={20} />
+              <Gamepad2 size={20} />
               <span className="text-sm font-medium tracking-wide">{currentGameModeLabel}</span>
             </motion.button>
 

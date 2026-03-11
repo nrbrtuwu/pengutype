@@ -1,6 +1,6 @@
 import { RefObject, useCallback, useEffect, useLayoutEffect, useState } from "react";
 
-export type CaretStyle = "line" | "block" | "underline";
+export type CaretStyle = "line";
 
 interface UseCaretPositionParams {
   wordsRef: RefObject<HTMLDivElement | null>;
@@ -22,7 +22,7 @@ export function useCaretPosition({
   const [caretPosition, setCaretPosition] = useState({ x: 0, y: 0 });
   const [isCaretReady, setIsCaretReady] = useState(false);
 
-  const caretHeight = caretStyle === "underline" ? 3 : Math.max(10, Math.round(fontSize * 1.2));
+  const caretHeight = Math.max(10, Math.round(fontSize * 1.2));
 
   const updateCaretPosition = useCallback(() => {
     if (!wordsRef.current) {
@@ -46,10 +46,6 @@ export function useCaretPosition({
       containerRect.top +
       container.scrollTop +
       Math.max(0, (anchorRect.height - caretHeight) / 2);
-
-    if (caretStyle === "underline") {
-      top = anchorRect.bottom - containerRect.top + container.scrollTop - caretHeight;
-    }
 
     setCaretPosition((prev) => {
       if (Math.abs(prev.x - left) < 0.5 && Math.abs(prev.y - top) < 0.5) {

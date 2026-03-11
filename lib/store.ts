@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import { getRandomWords } from '@/lib/words';
 import { languages } from '@/languages';
 import type { LanguageKey } from '@/languages';
-import { ThemeKey } from './themes';
+import { ThemeKey, themes } from './themes';
 import { calculateCharacterStats, calculatePerformanceStats, calculateSeparatorStats, validateTestAttempt } from './typing-metrics';
 
 export type TestMode = 'time' | 'words';
@@ -69,7 +69,7 @@ interface TypingState {
   showCommandPalette: boolean;
   showStatsPanel: boolean;
   smoothCaret: boolean;
-  caretStyle: 'line' | 'block' | 'underline';
+  caretStyle: 'line';
   fontSize: number;
   restartKeybind: RestartKeybind;
   cloudSyncStatus: CloudSyncStatus;
@@ -101,7 +101,7 @@ interface TypingState {
   toggleStatsPanel: () => void;
   setShowStatsPanel: (show: boolean) => void;
   setSmoothCaret: (smooth: boolean) => void;
-  setCaretStyle: (style: 'line' | 'block' | 'underline') => void;
+  setCaretStyle: (style: 'line') => void;
   setFontSize: (size: number) => void;
   setRestartKeybind: (keybind: RestartKeybind) => void;
   setCloudSyncState: (status: CloudSyncStatus, pendingCount: number) => void;
@@ -446,7 +446,7 @@ export const useTypingStore = create<TypingState>()(
       toggleStatsPanel: () => set({ showStatsPanel: !get().showStatsPanel }),
       setShowStatsPanel: (show) => set({ showStatsPanel: show }),
       setSmoothCaret: (smooth) => set({ smoothCaret: smooth }),
-      setCaretStyle: (style) => set({ caretStyle: style }),
+      setCaretStyle: () => set({ caretStyle: 'line' }),
       setFontSize: (size) => set({ fontSize: size }),
       setRestartKeybind: (restartKeybind) => set({ restartKeybind }),
       setHasHydrated: (hasHydrated) => set({ hasHydrated }),
@@ -500,6 +500,32 @@ export const useTypingStore = create<TypingState>()(
     }),
     {
       name: 'pengutype-storage',
+      merge: (persistedState, currentState) => {
+        const incomingState = (persistedState as Partial<TypingState>) ?? {};
+        const mergedState = { ...currentState, ...incomingState };
+
+        const incomingTheme = incomingState.theme;
+        const incomingLanguage = incomingState.language;
+        const incomingGameMode = (incomingState as { gameMode?: string }).gameMode;
+
+        const safeTheme =
+          typeof incomingTheme === 'string' && incomingTheme in themes
+            ? (incomingTheme as ThemeKey)
+            : currentState.theme;
+
+        const safeLanguage =
+          typeof incomingLanguage === 'string' && incomingLanguage in languages
+            ? (incomingLanguage as LanguageKey)
+            : currentState.language;
+
+        return {
+          ...mergedState,
+          theme: safeTheme,
+          language: safeLanguage,
+          caretStyle: 'line',
+          gameMode: incomingGameMode === 'spell-climb' ? 'spell-ladder' : mergedState.gameMode,
+        };
+      },
       partialize: (state) => ({
         gameMode: state.gameMode,
         spellingRepeatMode: state.spellingRepeatMode,
@@ -516,9 +542,16 @@ export const useTypingStore = create<TypingState>()(
       }),
       onRehydrateStorage: () => (state, error) => {
         if (!error) {
+          const themeKey = state?.theme;
+          if (themeKey && !(themeKey in themes)) {
+            state?.setTheme('aurora');
+          }
           const languageKey = state?.language;
           if (languageKey && !(languageKey in languages)) {
             state?.setLanguage('english');
+          }
+          if (state?.caretStyle !== 'line') {
+            state?.setCaretStyle('line');
           }
           if ((state as { gameMode?: string } | undefined)?.gameMode === 'spell-climb') {
             state?.setGameMode('spell-ladder');

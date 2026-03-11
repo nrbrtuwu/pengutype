@@ -3,9 +3,8 @@
 import { useEffect } from "react";
 import { useTypingStore } from "@/lib/store";
 import { themes, ThemeKey } from "@/lib/themes";
-import { languages, LanguageKey, getLanguageDisplayName } from "@/lib/words";
 import { motion } from "framer-motion";
-import { X, Check, Palette, Globe, Type, Keyboard, Sparkles } from "lucide-react";
+import { X, Check, Palette, Type, Keyboard, Sparkles } from "lucide-react";
 
 export function SettingsPanel() {
   const {
@@ -13,12 +12,8 @@ export function SettingsPanel() {
     setShowSettings,
     theme,
     setTheme,
-    language,
-    setLanguage,
     smoothCaret,
     setSmoothCaret,
-    caretStyle,
-    setCaretStyle,
     fontSize,
     setFontSize,
     restartKeybind,
@@ -28,7 +23,6 @@ export function SettingsPanel() {
   const currentTheme = themes[theme];
 
   const fontSizes = [16, 20, 24, 28, 32];
-  const caretStyles: ("line" | "block" | "underline")[] = ["line", "block", "underline"];
   const restartKeybindOptions: { key: "tab-enter" | "tab"; label: string }[] = [
     { key: "tab-enter", label: "tab + enter" },
     { key: "tab", label: "tab" }
@@ -68,7 +62,7 @@ export function SettingsPanel() {
         initial={{ opacity: 0, x: 300, scale: 0.95 }}
         animate={{ opacity: 1, x: 0, scale: 1 }}
         transition={{ type: "spring", damping: 25, stiffness: 300 }}
-        className="fixed right-4 top-4 bottom-4 w-full max-w-md z-50 overflow-y-auto rounded-3xl glass-strong"
+        className="fixed right-4 top-4 bottom-4 w-full max-w-md z-50 rounded-3xl glass-strong"
       >
         <div className="p-6">
               {/* Header */}
@@ -152,45 +146,6 @@ export function SettingsPanel() {
                       </span>
                       {theme === key && (
                         <Check size={14} style={{ color: currentTheme.primary }} className="ml-auto relative z-10" />
-                      )}
-                    </motion.button>
-                  ))}
-                </div>
-              </section>
-
-              {/* Language section */}
-              <section className="mb-8">
-                <div className="flex items-center gap-2 mb-4">
-                  <Globe size={18} style={{ color: currentTheme.primary }} />
-                  <h3 
-                    className="text-sm tracking-wider font-bold"
-                    style={{ color: currentTheme.foreground }}
-                  >
-                    language
-                  </h3>
-                </div>
-                <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-2 hide-scrollbar">
-                  {Object.entries(languages).map(([key, lang]) => (
-                    <motion.button
-                      key={key}
-                      onClick={() => setLanguage(key as LanguageKey)}
-                      className="flex items-center gap-3 p-3 rounded-xl transition-all text-left"
-                      style={{
-                        backgroundColor: language === key ? `${currentTheme.primary}22` : 'transparent',
-                        borderWidth: 1,
-                        borderColor: language === key ? `${currentTheme.primary}66` : `${currentTheme.sub}22`
-                      }}
-                      whileHover={{ scale: 1.02, backgroundColor: `${currentTheme.sub}22` }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      <span 
-                        className="text-sm font-medium truncate"
-                        style={{ color: language === key ? currentTheme.primary : currentTheme.foreground }}
-                      >
-                        {getLanguageDisplayName(key)}
-                      </span>
-                      {language === key && (
-                        <Check size={14} style={{ color: currentTheme.primary }} className="ml-auto" />
                       )}
                     </motion.button>
                   ))}
@@ -297,48 +252,6 @@ export function SettingsPanel() {
                   >
                     caret
                   </h3>
-                </div>
-
-                {/* Caret style */}
-                <div className="mb-4">
-                  <label 
-                    className="text-xs tracking-wider mb-2 block font-medium"
-                    style={{ color: currentTheme.sub }}
-                  >
-                    style
-                  </label>
-                  <div className="flex gap-2">
-                    {caretStyles.map((style) => (
-                      <motion.button
-                        key={style}
-                        onClick={() => setCaretStyle(style)}
-                        className="relative flex-1 py-3 rounded-xl text-sm font-medium capitalize transition-all overflow-hidden"
-                        style={{
-                          color: caretStyle === style ? currentTheme.background : currentTheme.foreground
-                        }}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                      >
-                        {caretStyle === style && (
-                          <motion.div
-                            layoutId="caret-active"
-                            className="absolute inset-0 rounded-xl"
-                            style={{ 
-                              background: `linear-gradient(135deg, ${currentTheme.primary}, ${currentTheme.caret})`,
-                              boxShadow: `0 0 20px ${currentTheme.primary}44`
-                            }}
-                          />
-                        )}
-                        {caretStyle !== style && (
-                          <div 
-                            className="absolute inset-0 rounded-xl"
-                            style={{ backgroundColor: `${currentTheme.sub}22` }}
-                          />
-                        )}
-                        <span className="relative z-10">{style}</span>
-                      </motion.button>
-                    ))}
-                  </div>
                 </div>
 
                 {/* Smooth caret toggle */}

@@ -54,9 +54,7 @@ export default function RootLayout({
       tokyo_night: '#7aa2f7',
       catppuccin: '#cba6f7',
       midnight: '#00d9ff',
-      matrix: '#00ff41',
-      rose_pine: '#eb6f92',
-      gruvbox: '#fabd2f'
+      rose_pine: '#eb6f92'
     };
 
     const color = themeToPrimary[theme] || themeToPrimary.aurora;

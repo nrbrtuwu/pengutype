@@ -15,13 +15,13 @@ interface AnimatedCaretProps {
 export function AnimatedCaret({
   caretPosition,
   smoothCaret,
-  caretStyle,
+  caretStyle: _caretStyle,
   fontSize,
   theme,
 }: AnimatedCaretProps) {
   const currentTheme = themes[theme];
-  const caretWidth = caretStyle === "line" ? 2 : Math.max(2, Math.round(fontSize * 0.58));
-  const caretHeight = caretStyle === "underline" ? 3 : Math.max(10, Math.round(fontSize * 1.2));
+  const caretWidth = 2;
+  const caretHeight = Math.max(10, Math.round(fontSize * 1.2));
 
   return (
     <motion.div
@@ -37,7 +37,7 @@ export function AnimatedCaret({
         width: caretWidth,
         height: caretHeight,
         backgroundColor: currentTheme.caret,
-        borderRadius: caretStyle === "line" ? 1 : 2,
+        borderRadius: 1,
         boxShadow: `0 0 10px ${currentTheme.caret}`,
         left: 0,
         top: 0,
