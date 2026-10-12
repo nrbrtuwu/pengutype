@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useTypingStore } from "@/lib/store";
+import { useTypingStore, TIME_OPTIONS, WORD_OPTIONS } from "@/lib/store";
 import { themes, ThemeKey } from "@/lib/themes";
 import { languages, LanguageKey, getLanguageDisplayName } from "@/lib/words";
 import { motion, AnimatePresence } from "framer-motion";
@@ -55,7 +55,7 @@ export function CommandPalette() {
     });
 
     // Language commands
-    Object.entries(languages).forEach(([key, lang]) => {
+    Object.keys(languages).forEach((key) => {
       cmds.push({
         id: `lang-${key}`,
         icon: <Globe size={16} />,
@@ -91,7 +91,7 @@ export function CommandPalette() {
     });
 
     // Time options
-    [15, 30, 60, 120].forEach((t) => {
+    TIME_OPTIONS.forEach((t) => {
       cmds.push({
         id: `time-${t}`,
         icon: <Clock size={16} />,
@@ -99,14 +99,14 @@ export function CommandPalette() {
         category: "time",
         action: () => {
           setMode("time");
-          setTimeOption(t as 15 | 30 | 60 | 120);
+          setTimeOption(t);
           toggleCommandPalette();
         }
       });
     });
 
     // Word options
-    [10, 25, 50, 100].forEach((w) => {
+    WORD_OPTIONS.forEach((w) => {
       cmds.push({
         id: `words-${w}`,
         icon: <Hash size={16} />,
@@ -114,7 +114,7 @@ export function CommandPalette() {
         category: "words",
         action: () => {
           setMode("words");
-          setWordOption(w as 10 | 25 | 50 | 100);
+          setWordOption(w);
           toggleCommandPalette();
         }
       });

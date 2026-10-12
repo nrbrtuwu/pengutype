@@ -32,14 +32,6 @@ export function TypingTest() {
   } = useTypingStore();
   const currentTheme = themes[theme];
 
-  // Generate words on mount and when settings change
-  const generateWords = useCallback(() => {
-    if (gameMode !== "normal") {
-      return;
-    }
-
-    resetTest();
-  }, [gameMode, mode, wordOption, language, resetTest]);
 
   const resetFromKeybind = useCallback(() => {
     if (suppressResultRecording && !isTestActive) {
@@ -50,9 +42,12 @@ export function TypingTest() {
     resetTest();
   }, [suppressResultRecording, isTestActive, exitRetryMode, resetTest]);
 
+  // New words on mount and whenever test settings change
   useEffect(() => {
-    generateWords();
-  }, [generateWords]);
+    if (gameMode === "normal") {
+      resetTest();
+    }
+  }, [gameMode, mode, wordOption, language, resetTest]);
 
   // Keyboard shortcuts for restart
   useEffect(() => {
@@ -113,7 +108,6 @@ export function TypingTest() {
       window.removeEventListener("blur", handleWindowBlur);
     };
   }, [
-    generateWords,
     resetFromKeybind,
     isTestActive,
     isTestComplete,
@@ -159,9 +153,7 @@ export function TypingTest() {
         }}
       />
 
-      {/* Vertical sidebar for mode selection */}
-      {gameMode === "normal" && <ModeSelector />}
-      {gameMode === "spell-ladder" && <SpellLadderSelector />}
+      {gameMode === "normal" ? <ModeSelector /> : <SpellLadderSelector />}
 
       {/* Main content area */}
       <div className="w-full max-w-4xl mx-auto">

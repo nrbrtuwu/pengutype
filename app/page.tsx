@@ -21,10 +21,18 @@ export default function Home() {
 
   const currentTheme = themes[theme];
 
+  // Expose theme colors as CSS variables so components can use them in classes (e.g. hover states)
+  const themeVars = {
+    "--theme-bg": currentTheme.background,
+    "--theme-fg": currentTheme.foreground,
+    "--theme-primary": currentTheme.primary,
+    "--theme-sub": currentTheme.sub,
+  } as CSSProperties;
+
   return (
     <main
       className="min-h-screen transition-colors duration-500 relative overflow-hidden"
-      style={{ backgroundColor: currentTheme.background, "--theme-bg": currentTheme.background } as CSSProperties}
+      style={{ backgroundColor: currentTheme.background, ...themeVars }}
     >
       <AnimatedBackground />
       <HistoryBackupSync />

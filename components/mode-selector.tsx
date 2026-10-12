@@ -1,9 +1,9 @@
 "use client";
 
-import { useTypingStore, TestMode, TimeOption, WordOption } from "@/lib/store";
+import { useTypingStore, TestMode, TIME_OPTIONS, WORD_OPTIONS } from "@/lib/store";
 import { themes } from "@/lib/themes";
-import { Timer, Type, RotateCcw } from "lucide-react";
-import { motion } from "framer-motion";
+import { Timer, Type } from "lucide-react";
+import { RailDivider, RailGroup, RailOption, RailRestart, SideRail } from "./side-rail";
 
 const modeIcons = {
   time: Timer,
@@ -12,7 +12,6 @@ const modeIcons = {
 
 export function ModeSelector() {
   const {
-    gameMode,
     mode,
     setMode,
     timeOption,
@@ -28,138 +27,56 @@ export function ModeSelector() {
 
   const currentTheme = themes[theme];
 
-  const timeOptions: TimeOption[] = [15, 30, 60, 120];
-  const wordOptions: WordOption[] = [10, 25, 50, 100];
-  const restartShortcutLabel = restartKeybind === "tab" ? "tab" : "tab + enter";
-
-  // Hide during active test or when complete
-  if (gameMode !== "normal" || isTestActive || isTestComplete) {
+  if (isTestActive || isTestComplete) {
     return null;
   }
 
-  const handleModeChange = (newMode: TestMode) => {
-    setMode(newMode);
-    resetTest();
-  };
-
   return (
-    <motion.div
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-      className="fixed left-6 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-3"
-    >
-      {/* Mode selection */}
-      <div 
-        className="flex flex-col gap-1 p-2 rounded-xl"
-        style={{ 
-          backgroundColor: `${currentTheme.background}ee`,
-          border: `1px solid ${currentTheme.sub}22`,
-          backdropFilter: 'blur(12px)',
-        }}
-      >
+    <SideRail>
+      <RailGroup theme={currentTheme}>
         {(["time", "words"] as TestMode[]).map((m) => {
           const Icon = modeIcons[m];
           const isActive = mode === m;
-          
+
           return (
             <button
               key={m}
-              onClick={() => handleModeChange(m)}
+              onClick={() => {
+                setMode(m);
+                resetTest();
+              }}
               className="relative flex items-center justify-center w-10 h-10 rounded-lg transition-all duration-200 hover:scale-105"
               style={{
-                backgroundColor: isActive ? `${currentTheme.primary}22` : 'transparent',
-                border: isActive ? `1px solid ${currentTheme.primary}44` : '1px solid transparent',
+                backgroundColor: isActive ? `${currentTheme.primary}22` : "transparent",
+                border: isActive ? `1px solid ${currentTheme.primary}44` : "1px solid transparent",
               }}
               title={m}
             >
-              <Icon 
-                size={18} 
-                style={{ color: isActive ? currentTheme.primary : currentTheme.sub }} 
-              />
+              <Icon size={18} style={{ color: isActive ? currentTheme.primary : currentTheme.sub }} />
             </button>
           );
         })}
-      </div>
+      </RailGroup>
 
-      {/* Divider */}
-      <div 
-        className="w-6 mx-auto h-px"
-        style={{ backgroundColor: `${currentTheme.sub}33` }}
-      />
+      <RailDivider theme={currentTheme} />
 
-      {/* Time/Word options */}
-      <div 
-        className="flex flex-col gap-1 p-2 rounded-xl"
-        style={{ 
-          backgroundColor: `${currentTheme.background}ee`,
-          border: `1px solid ${currentTheme.sub}22`,
-          backdropFilter: 'blur(12px)',
-        }}
-      >
+      <RailGroup theme={currentTheme}>
         {mode === "time"
-          ? timeOptions.map((t) => {
-              const isActive = timeOption === t;
-              return (
-                <button
-                  key={t}
-                  onClick={() => setTimeOption(t)}
-                  className="relative flex items-center justify-center w-10 h-10 rounded-lg font-mono text-sm font-medium transition-all duration-200 hover:scale-105"
-                  style={{
-                    backgroundColor: isActive ? currentTheme.primary : 'transparent',
-                    color: isActive ? currentTheme.background : currentTheme.sub,
-                    boxShadow: isActive ? `0 0 15px ${currentTheme.primary}44` : 'none',
-                  }}
-                >
-                  {t}
-                </button>
-              );
-            })
-          : wordOptions.map((w) => {
-              const isActive = wordOption === w;
-              return (
-                <button
-                  key={w}
-                  onClick={() => setWordOption(w)}
-                  className="relative flex items-center justify-center w-10 h-10 rounded-lg font-mono text-sm font-medium transition-all duration-200 hover:scale-105"
-                  style={{
-                    backgroundColor: isActive ? currentTheme.primary : 'transparent',
-                    color: isActive ? currentTheme.background : currentTheme.sub,
-                    boxShadow: isActive ? `0 0 15px ${currentTheme.primary}44` : 'none',
-                  }}
-                >
-                  {w}
-                </button>
-              );
-            })}
-      </div>
+          ? TIME_OPTIONS.map((t) => (
+              <RailOption key={t} active={timeOption === t} onClick={() => setTimeOption(t)} theme={currentTheme}>
+                {t}
+              </RailOption>
+            ))
+          : WORD_OPTIONS.map((w) => (
+              <RailOption key={w} active={wordOption === w} onClick={() => setWordOption(w)} theme={currentTheme}>
+                {w}
+              </RailOption>
+            ))}
+      </RailGroup>
 
-      {/* Divider */}
-      <div 
-        className="w-6 mx-auto h-px"
-        style={{ backgroundColor: `${currentTheme.sub}33` }}
-      />
+      <RailDivider theme={currentTheme} />
 
-      {/* Restart button */}
-      <div 
-        className="flex flex-col p-2 rounded-xl"
-        style={{ 
-          backgroundColor: `${currentTheme.background}ee`,
-          border: `1px solid ${currentTheme.sub}22`,
-          backdropFilter: 'blur(12px)',
-        }}
-      >
-        <button
-          onClick={() => resetTest()}
-          className="flex items-center justify-center w-10 h-10 rounded-lg transition-all duration-200 hover:scale-105 hover:rotate-[-30deg]"
-          style={{
-            color: currentTheme.sub,
-          }}
-          title={`restart (${restartShortcutLabel})`}
-        >
-          <RotateCcw size={18} />
-        </button>
-      </div>
-    </motion.div>
+      <RailRestart onClick={resetTest} restartKeybind={restartKeybind} theme={currentTheme} />
+    </SideRail>
   );
 }

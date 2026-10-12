@@ -2,15 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Clock3, Type, Target, RotateCcw, ChevronRight, AlertCircle } from "lucide-react";
+import { Clock3, Type, Target, AlertCircle } from "lucide-react";
 import { useTypingStore } from "@/lib/store";
 import { themes } from "@/lib/themes";
 import { getSpellingChain } from "@/lib/words";
 import { useCaretPosition } from "@/hooks/use-caret-position";
 import { AnimatedCaret } from "./animated-caret";
-import { createPortal } from "react-dom";
-
-const ROUND_SECONDS = 60;
+import { CharBreakdown, DetailItem, NewBestCelebration, RestartHint, ResultActions, StatTile } from "./result-parts";
 
 export function SpellingClimb() {
   const {
@@ -24,6 +22,8 @@ export function SpellingClimb() {
     setInvalidationNotice,
     addSpellLadderResult,
     spellLadderResults,
+    spellLadderResetRequest,
+    setSpellLadderStarted,
   } = useTypingStore();
   const currentTheme = themes[theme];
   const wordsRef = useRef<HTMLDivElement>(null);
@@ -33,7 +33,7 @@ export function SpellingClimb() {
   const [queuedChain, setQueuedChain] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [typed, setTyped] = useState("");
-  const [timeLeft, setTimeLeft] = useState(ROUND_SECONDS);
+  const [timeLeft, setTimeLeft] = useState<number>(timeOption);
   const [isActive, setIsActive] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
   const [startedAt, setStartedAt] = useState<number | null>(null);
@@ -45,7 +45,6 @@ export function SpellingClimb() {
   const [incorrectChars, setIncorrectChars] = useState(0);
   const [singleRunCompleted, setSingleRunCompleted] = useState(false);
   const [isRoundNewBest, setIsRoundNewBest] = useState(false);
-  const [showConfetti, setShowConfetti] = useState(false);
   const hasRecordedResultRef = useRef(false);
 
   const generateChain = useCallback((excludeSignature?: string) => {
@@ -84,10 +83,9 @@ export function SpellingClimb() {
     setIncorrectChars(0);
     setSingleRunCompleted(false);
     setIsRoundNewBest(false);
-    setShowConfetti(false);
     hasRecordedResultRef.current = false;
-    window.dispatchEvent(new CustomEvent("spell-ladder-reset"));
-  }, [generateChain, timeOption]);
+    setSpellLadderStarted(false);
+  }, [generateChain, timeOption, setSpellLadderStarted]);
 
   useEffect(() => {
     if (!isComplete || hasRecordedResultRef.current || !startedAt) {
@@ -165,20 +163,10 @@ export function SpellingClimb() {
     timeOption,
   ]);
 
+  // Also rebuilds when the header logo or selector requests a reset
   useEffect(() => {
     buildRound();
-  }, [buildRound]);
-
-  useEffect(() => {
-    const handleSpellReset = () => {
-      buildRound();
-    };
-
-    window.addEventListener("spell-ladder-request-reset", handleSpellReset as EventListener);
-    return () => {
-      window.removeEventListener("spell-ladder-request-reset", handleSpellReset as EventListener);
-    };
-  }, [buildRound]);
+  }, [buildRound, spellLadderResetRequest]);
 
   useEffect(() => {
     if (!isActive || isComplete) {
@@ -298,7 +286,7 @@ export function SpellingClimb() {
     typed,
     currentTheme.primary,
     currentTheme.incorrect,
-    currentTheme.foreground,
+    currentTheme.missing,
   ]);
 
   useEffect(() => {
@@ -363,7 +351,7 @@ export function SpellingClimb() {
         const now = Date.now();
         setStartedAt(now);
         setLastInputAt(now);
-        window.dispatchEvent(new CustomEvent("spell-ladder-start"));
+        setSpellLadderStarted(true);
       } else {
         setLastInputAt(Date.now());
       }
@@ -441,7 +429,6 @@ export function SpellingClimb() {
     queuedChain,
     generateChain,
     wordChain,
-    wordChain.length,
   ]);
 
   const elapsedSeconds = Math.max(0, timeOption - timeLeft);
@@ -453,93 +440,15 @@ export function SpellingClimb() {
     const endMs = completedAt ?? Date.now();
     return Math.max(0.001, (endMs - startedAt) / 1000);
   }, [completedAt, elapsedSeconds, startedAt]);
-  const missedChars = useMemo(() => {
-    if (!isComplete || !currentWord) {
-      return 0;
-    }
-
-    return Math.max(0, currentWord.length - typed.length);
-  }, [currentWord, isComplete, typed.length]);
-
   const totalTypedChars = correctChars + incorrectChars;
   const accuracy = totalTypedChars > 0 ? Math.round((correctChars / totalTypedChars) * 100) : 100;
   const isSingleRepeatMode = spellingRepeatMode === "single";
   const spellingWpm = isInvalidated
     ? 0
     : Math.max(0, Math.round((correctChars / 5) / (elapsedSecondsPrecise / 60)));
-  const timeDisplay = isSingleRepeatMode ? `${elapsedSecondsPrecise.toFixed(2)}s` : `${elapsedSeconds}s`;
-
-  const isNewBest = isRoundNewBest;
-
-  const confettiPieces = useMemo(
-    () =>
-      Array.from({ length: 90 }, (_, index) => ({
-        id: index,
-        x: Math.random() * 100,
-        drift: (Math.random() - 0.5) * 320,
-        rotate: (Math.random() - 0.5) * 720,
-        size: 5 + Math.random() * 8,
-        delay: Math.random() * 0.45,
-        duration: 1.2 + Math.random() * 1.2,
-      })),
-    [completedAt, isRoundNewBest]
-  );
-
-  useEffect(() => {
-    if (!isNewBest) {
-      setShowConfetti(false);
-      return;
-    }
-
-    setShowConfetti(true);
-    const timer = window.setTimeout(() => setShowConfetti(false), 1800);
-    return () => window.clearTimeout(timer);
-  }, [isNewBest, completedAt]);
 
   return (
     <div className="w-full max-w-4xl mx-auto">
-      {typeof document !== "undefined" &&
-        createPortal(
-          <AnimatePresence>
-            {showConfetti && (
-              <div className="fixed inset-0 pointer-events-none z-[120] overflow-hidden">
-                {confettiPieces.map((piece) => (
-                  <motion.div
-                    key={piece.id}
-                    className="absolute rounded-[2px]"
-                    style={{
-                      left: `${piece.x}%`,
-                      top: "-10vh",
-                      width: piece.size,
-                      height: piece.size * 0.65,
-                      backgroundColor:
-                        piece.id % 3 === 0
-                          ? currentTheme.primary
-                          : piece.id % 3 === 1
-                            ? currentTheme.caret
-                            : currentTheme.foreground,
-                    }}
-                    initial={{ y: 0, x: 0, rotate: 0, opacity: 0 }}
-                    animate={{
-                      y: "120vh",
-                      x: piece.drift,
-                      rotate: piece.rotate,
-                      opacity: [0, 1, 1, 0],
-                    }}
-                    exit={{ opacity: 0 }}
-                    transition={{
-                      duration: piece.duration,
-                      delay: piece.delay,
-                      ease: "easeOut",
-                    }}
-                  />
-                ))}
-              </div>
-            )}
-          </AnimatePresence>,
-          document.body
-        )}
-
       {!isComplete && (
         <div className="mb-8 h-[56px] flex items-center justify-center" aria-hidden={!isActive}>
           {isActive && (
@@ -592,24 +501,7 @@ export function SpellingClimb() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             className="w-full"
           >
-            {isNewBest && (
-              <motion.div
-                initial={{ opacity: 0, y: 10, scale: 0.97 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                className="mb-4 text-center"
-              >
-                <span
-                  className="inline-flex items-center px-4 py-2 rounded-full text-sm font-bold tracking-wide"
-                  style={{
-                    background: `linear-gradient(135deg, ${currentTheme.primary}33, ${currentTheme.caret}33)`,
-                    color: currentTheme.foreground,
-                    boxShadow: `0 0 24px ${currentTheme.primary}33`,
-                  }}
-                >
-                  🎉 new best!
-                </span>
-              </motion.div>
-            )}
+            <NewBestCelebration show={isRoundNewBest} burstKey={completedAt} theme={currentTheme} />
 
             <div className={`grid grid-cols-2 ${isSingleRepeatMode ? "md:grid-cols-4" : "md:grid-cols-3"} gap-4 mb-8`}>
               {isSingleRepeatMode && (
@@ -628,119 +520,44 @@ export function SpellingClimb() {
                 </div>
               )}
 
-              <div className="text-center p-6 rounded-2xl" style={{ backgroundColor: `${currentTheme.background}dd` }}>
-                <Type className="mx-auto mb-2" size={24} style={{ color: isSingleRepeatMode ? currentTheme.caret : currentTheme.primary }} />
-                <div className="text-5xl md:text-6xl font-mono font-bold" style={{ color: isSingleRepeatMode ? currentTheme.caret : currentTheme.primary }}>
-                  {isSingleRepeatMode ? spellingWpm : completedWords}
-                </div>
-                <div className="text-sm tracking-wider mt-2 font-medium" style={{ color: isSingleRepeatMode ? currentTheme.caret : currentTheme.sub }}>
-                  {isSingleRepeatMode ? "wpm" : "score"}
-                </div>
-              </div>
-
-              <div className="text-center p-6 rounded-2xl" style={{ backgroundColor: `${currentTheme.background}dd` }}>
-                <Target className="mx-auto mb-2" size={24} style={{ color: currentTheme.foreground }} />
-                <div className="text-5xl md:text-6xl font-mono font-bold" style={{ color: currentTheme.foreground }}>
-                  {accuracy}%
-                </div>
-                <div className="text-sm tracking-wider mt-2 font-medium" style={{ color: currentTheme.sub }}>
-                  accuracy
-                </div>
-              </div>
-
-              <div className="text-center p-6 rounded-2xl" style={{ backgroundColor: `${currentTheme.background}dd` }}>
-                <AlertCircle className="mx-auto mb-2" size={24} style={{ color: currentTheme.incorrect }} />
-                <div className="text-5xl md:text-6xl font-mono font-bold" style={{ color: currentTheme.incorrect }}>
-                  {incorrectChars}
-                </div>
-                <div className="text-sm tracking-wider mt-2 font-medium" style={{ color: currentTheme.incorrect }}>
-                  incorrect letters
-                </div>
-              </div>
+              <StatTile
+                icon={Type}
+                value={isSingleRepeatMode ? spellingWpm : completedWords}
+                label={isSingleRepeatMode ? "wpm" : "score"}
+                color={isSingleRepeatMode ? currentTheme.caret : currentTheme.primary}
+                labelColor={isSingleRepeatMode ? currentTheme.caret : currentTheme.sub}
+                theme={currentTheme}
+              />
+              <StatTile icon={Target} value={`${accuracy}%`} label="accuracy" color={currentTheme.foreground} theme={currentTheme} />
+              <StatTile
+                icon={AlertCircle}
+                value={incorrectChars}
+                label="incorrect letters"
+                color={currentTheme.incorrect}
+                labelColor={currentTheme.incorrect}
+                theme={currentTheme}
+              />
             </div>
 
             <div className="rounded-2xl p-6 mb-8" style={{ backgroundColor: `${currentTheme.background}dd` }}>
               <div className={`grid grid-cols-2 ${isSingleRepeatMode ? "md:grid-cols-3" : "md:grid-cols-4"} gap-6 text-center`}>
-                <div>
-                  <div className="text-xs tracking-wider mb-2 font-medium" style={{ color: currentTheme.sub }}>mode</div>
-                  <div className="text-lg font-mono font-medium" style={{ color: currentTheme.foreground }}>spell ladder</div>
-                </div>
-                <div>
-                  <div className="text-xs tracking-wider mb-2 font-medium" style={{ color: currentTheme.sub }}>characters</div>
-                  <div className="relative inline-flex group">
-                    <div className="text-lg font-mono flex items-center gap-1 font-medium cursor-help">
-                      <span style={{ color: currentTheme.correct }}>{correctChars}</span>
-                      <span style={{ color: currentTheme.sub }}>/</span>
-                      <span style={{ color: currentTheme.incorrect }}>{incorrectChars}</span>
-                    </div>
-
-                    <div
-                      className="pointer-events-none absolute left-1/2 top-full mt-2 -translate-x-1/2 rounded-lg px-3 py-2 text-xs font-mono whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-20"
-                      style={{
-                        color: currentTheme.foreground,
-                        backgroundColor: `${currentTheme.background}f2`,
-                        boxShadow: `0 8px 24px ${currentTheme.background}cc`
-                      }}
-                    >
-                      <div>correct: {correctChars}</div>
-                      <div>incorrect: {incorrectChars}</div>
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs tracking-wider mb-2 font-medium" style={{ color: currentTheme.sub }}>language</div>
-                  <div className="text-lg font-mono font-medium" style={{ color: currentTheme.foreground }}>{language.toLowerCase()}</div>
-                </div>
-                {!isSingleRepeatMode && (
-                  <div>
-                    <div className="text-xs tracking-wider mb-2 font-medium" style={{ color: currentTheme.sub }}>time</div>
-                    <div className="text-lg font-mono font-medium" style={{ color: currentTheme.foreground }}>{timeDisplay}</div>
-                  </div>
-                )}
+                <DetailItem label="mode" theme={currentTheme}>spell ladder</DetailItem>
+                <DetailItem label="characters" theme={currentTheme}>
+                  <CharBreakdown
+                    theme={currentTheme}
+                    parts={[
+                      { label: "correct", value: correctChars, color: currentTheme.correct },
+                      { label: "incorrect", value: incorrectChars, color: currentTheme.incorrect },
+                    ]}
+                  />
+                </DetailItem>
+                <DetailItem label="language" theme={currentTheme}>{language.toLowerCase()}</DetailItem>
+                {!isSingleRepeatMode && <DetailItem label="time" theme={currentTheme}>{elapsedSeconds}s</DetailItem>}
               </div>
             </div>
 
-            <div className="flex items-center justify-center gap-4">
-              <button
-                onClick={buildRound}
-                className="flex items-center gap-2 px-6 py-3.5 rounded-xl font-medium transition-all duration-200 hover:scale-[1.02]"
-                style={{ backgroundColor: `${currentTheme.background}dd`, color: currentTheme.foreground }}
-              >
-                <RotateCcw size={18} />
-                <span>try again</span>
-              </button>
-
-              <button
-                onClick={buildRound}
-                className="flex items-center gap-2 px-6 py-3.5 rounded-xl font-medium transition-all duration-200 hover:scale-[1.02]"
-                style={{
-                  background: `linear-gradient(135deg, ${currentTheme.primary}, ${currentTheme.caret})`,
-                  color: currentTheme.background,
-                  boxShadow: `0 0 20px ${currentTheme.primary}44`
-                }}
-              >
-                <span>next test</span>
-                <ChevronRight size={18} />
-              </button>
-            </div>
-
-            <div className="text-center mt-8">
-              <span className="text-sm font-medium" style={{ color: currentTheme.sub }}>
-                press{" "}
-                <kbd className="px-2 py-1 rounded-lg text-xs font-mono font-bold" style={{ backgroundColor: currentTheme.secondary, color: currentTheme.foreground }}>
-                  tab
-                </kbd>
-                {restartKeybind === "tab-enter" && (
-                  <>
-                    {" + "}
-                    <kbd className="px-2 py-1 rounded-lg text-xs font-mono font-bold" style={{ backgroundColor: currentTheme.secondary, color: currentTheme.foreground }}>
-                      enter
-                    </kbd>
-                  </>
-                )}
-                {" to restart"}
-              </span>
-            </div>
+            <ResultActions onRetry={buildRound} onNext={buildRound} theme={currentTheme} />
+            <RestartHint restartKeybind={restartKeybind} theme={currentTheme} />
           </motion.div>
         ) : (
           <>

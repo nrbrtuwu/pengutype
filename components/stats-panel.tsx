@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, BarChart3, Trash2 } from "lucide-react";
-import { useTypingStore } from "@/lib/store";
+import { useTypingStore, TIME_OPTIONS, WORD_OPTIONS, type GameMode } from "@/lib/store";
+import { getBucketKey } from "@/lib/results";
 import { themes } from "@/lib/themes";
 import { getLanguageDisplayName, LanguageKey } from "@/lib/words";
 
@@ -27,11 +28,9 @@ export function StatsPanel() {
 
   const currentTheme = themes[theme];
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageKey>(language);
-  const [selectedGameMode, setSelectedGameMode] = useState<"normal" | "spell-ladder">(gameMode);
+  const [selectedGameMode, setSelectedGameMode] = useState<GameMode>(gameMode);
 
-  const timeOptions = [15, 30, 60, 120] as const;
-  const wordOptions = [10, 25, 50, 100] as const;
-  const gameModeOptions: { key: "normal" | "spell-ladder"; label: string }[] = [
+  const gameModeOptions: { key: GameMode; label: string }[] = [
     { key: "normal", label: "normal" },
     { key: "spell-ladder", label: "spell ladder" },
   ];
@@ -86,10 +85,7 @@ export function StatsPanel() {
     const map = new Map<string, { tests: number; bestWpm: number; totalAccuracy: number }>();
 
     results.forEach((result) => {
-      const option = result.mode === "time" ? (result.timeOption ?? result.time) : (result.wordOption ?? null);
-      if (option === null || option === undefined) return;
-
-      const key = `${result.mode}|${result.language}|${option}`;
+      const key = getBucketKey(result);
       const existing = map.get(key);
 
       if (!existing) {
@@ -125,7 +121,7 @@ export function StatsPanel() {
   };
 
   const renderModeCard = (mode: "time" | "words") => {
-    const options = mode === "time" ? timeOptions : wordOptions;
+    const options = mode === "time" ? TIME_OPTIONS : WORD_OPTIONS;
     const optionLabel = mode === "time" ? "seconds" : "words";
 
     return (
@@ -340,7 +336,7 @@ export function StatsPanel() {
                       </div>
 
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        {timeOptions.map((option) => {
+                        {TIME_OPTIONS.map((option) => {
                           const stat = infiniteSpellStatsByLimit.get(option);
 
                           return (

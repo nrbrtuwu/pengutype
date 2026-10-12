@@ -4,7 +4,7 @@ import { getRandomWords } from '@/lib/words';
 import { languages } from '@/languages';
 import type { LanguageKey } from '@/languages';
 import { ThemeKey, themes } from './themes';
-import { calculateCharacterStats, calculatePerformanceStats, calculateSeparatorStats, validateTestAttempt } from './typing-metrics';
+import { calculateCharacterStats, calculatePerformanceStats, calculateSeparatorStats, validateTestAttempt, type TypedCharacter } from './typing-metrics';
 
 export type TestMode = 'time' | 'words';
 export type GameMode = 'normal' | 'spell-ladder';
@@ -12,7 +12,9 @@ export type SpellingRepeatMode = 'single' | 'infinite';
 export type TimeOption = 15 | 30 | 60 | 120;
 export type WordOption = 10 | 25 | 50 | 100;
 export type RestartKeybind = 'tab-enter' | 'tab';
-export type CloudSyncStatus = 'idle' | 'syncing' | 'synced' | 'error';
+
+export const TIME_OPTIONS: TimeOption[] = [15, 30, 60, 120];
+export const WORD_OPTIONS: WordOption[] = [10, 25, 50, 100];
 
 export interface TestResult {
   wpm: number;
@@ -27,7 +29,7 @@ export interface TestResult {
   language: LanguageKey;
   timeOption?: TimeOption;
   wordOption?: WordOption;
-  isValid: boolean;
+  isValid?: boolean;
   invalidReason?: string;
   timestamp: number;
 }
@@ -44,7 +46,7 @@ export interface SpellLadderResult {
 }
 
 interface TypingState {
-  // Test settings
+  // Settings
   gameMode: GameMode;
   spellingRepeatMode: SpellingRepeatMode;
   mode: TestMode;
@@ -52,45 +54,38 @@ interface TypingState {
   wordOption: WordOption;
   language: LanguageKey;
   theme: ThemeKey;
-  
+  smoothCaret: boolean;
+  fontSize: number;
+  restartKeybind: RestartKeybind;
+
   // Test state
   isTestActive: boolean;
   isTestComplete: boolean;
   currentWordIndex: number;
-  currentCharIndex: number;
   words: string[];
-  typedWords: string[];
-  typedChars: { char: string; correct: boolean; extra: boolean }[][];
+  typedChars: TypedCharacter[][];
   startTime: number | null;
-  endTime: number | null;
   timeLeft: number;
-  
-  // Statistics
-  correctChars: number;
-  incorrectChars: number;
-  extraChars: number;
-  missedChars: number;
-  
+  /** Retry mode: replays the same words and doesn't record the result. */
+  suppressResultRecording: boolean;
+  currentResult: TestResult | null;
+  invalidationNotice: { id: number; reason: string } | null;
+  spellLadderStarted: boolean;
+  /** Bumped to ask the spell ladder to build a new round. */
+  spellLadderResetRequest: number;
+
   // History
   results: TestResult[];
   spellLadderResults: SpellLadderResult[];
-  currentResult: TestResult | null;
-  
+
   // UI
   showSettings: boolean;
   showCommandPalette: boolean;
   showStatsPanel: boolean;
-  smoothCaret: boolean;
-  caretStyle: 'line';
-  fontSize: number;
-  restartKeybind: RestartKeybind;
-  cloudSyncStatus: CloudSyncStatus;
-  cloudSyncPendingCount: number;
   cloudLastSyncedAt: number | null;
+  cloudJoinedAt: string | null;
   hasHydrated: boolean;
-  suppressResultRecording: boolean;
-  invalidationNotice: { id: number; reason: string } | null;
-  
+
   // Actions
   setGameMode: (mode: GameMode) => void;
   setSpellingRepeatMode: (mode: SpellingRepeatMode) => void;
@@ -99,8 +94,9 @@ interface TypingState {
   setWordOption: (words: WordOption) => void;
   setLanguage: (language: LanguageKey) => void;
   setTheme: (theme: ThemeKey) => void;
-  setWords: (words: string[]) => void;
-  startTest: () => void;
+  setSmoothCaret: (smooth: boolean) => void;
+  setFontSize: (size: number) => void;
+  setRestartKeybind: (keybind: RestartKeybind) => void;
   endTest: () => void;
   resetTest: () => void;
   exitRetryMode: () => void;
@@ -112,433 +108,255 @@ interface TypingState {
   toggleCommandPalette: () => void;
   toggleStatsPanel: () => void;
   setShowStatsPanel: (show: boolean) => void;
-  setSmoothCaret: (smooth: boolean) => void;
-  setCaretStyle: (style: 'line') => void;
-  setFontSize: (size: number) => void;
-  setRestartKeybind: (keybind: RestartKeybind) => void;
-  setCloudSyncState: (status: CloudSyncStatus, pendingCount: number) => void;
-  setHasHydrated: (hasHydrated: boolean) => void;
+  setCloudLastSyncedAt: (timestamp: number | null) => void;
+  setCloudJoinedAt: (joinedAt: string | null) => void;
+  setHasHydrated: () => void;
   mergeResults: (incomingResults: TestResult[]) => void;
-  addResult: (result: TestResult) => void;
   addSpellLadderResult: (result: SpellLadderResult) => void;
   clearHistory: () => void;
   setInvalidationNotice: (reason: string) => void;
   clearInvalidationNotice: () => void;
+  setSpellLadderStarted: (started: boolean) => void;
+  requestSpellLadderReset: () => void;
 }
 
-function resultToKey(result: TestResult): string {
-  return [
-    result.timestamp,
-    result.mode,
-    result.language,
-    result.timeOption ?? '',
-    result.wordOption ?? '',
-    result.isValid ? '1' : '0',
-    result.invalidReason ?? '',
-    result.wpm,
-    result.rawWpm,
-    result.accuracy,
-    result.correctChars,
-    result.incorrectChars,
-    result.extraChars,
-    result.missedChars,
-    result.time,
-  ].join('|');
+/** Identity of a test for de-duplication. Cloud copies lack isValid and have rounded times, so only stable fields are used. */
+function resultIdentity(result: TestResult): string {
+  return `${result.timestamp}|${result.mode}|${result.language}`;
+}
+
+function freshTest(words: string[], timeOption: TimeOption, suppressResultRecording: boolean) {
+  return {
+    isTestActive: false,
+    isTestComplete: false,
+    currentWordIndex: 0,
+    words,
+    typedChars: words.map((): TypedCharacter[] => []),
+    startTime: null,
+    timeLeft: timeOption,
+    suppressResultRecording,
+    currentResult: null,
+    invalidationNotice: null,
+  };
 }
 
 export const useTypingStore = create<TypingState>()(
   persist(
-    (set, get) => ({
-      // Default settings
-      gameMode: 'normal',
-      spellingRepeatMode: 'infinite',
-      mode: 'time',
-      timeOption: 30,
-      wordOption: 25,
-      language: 'english',
-      theme: 'aurora',
-      
-      // Test state
-      isTestActive: false,
-      isTestComplete: false,
-      currentWordIndex: 0,
-      currentCharIndex: 0,
-      words: [],
-      typedWords: [],
-      typedChars: [],
-      startTime: null,
-      endTime: null,
-      timeLeft: 30,
-      
-      // Statistics
-      correctChars: 0,
-      incorrectChars: 0,
-      extraChars: 0,
-      missedChars: 0,
-      
-      // History
-      results: [],
-      spellLadderResults: [],
-      currentResult: null,
-      
-      // UI
-      showSettings: false,
-      showCommandPalette: false,
-      showStatsPanel: false,
-      smoothCaret: true,
-      caretStyle: 'line',
-      fontSize: 24,
-      restartKeybind: 'tab-enter',
-      cloudSyncStatus: 'idle',
-      cloudSyncPendingCount: 0,
-      cloudLastSyncedAt: null,
-      hasHydrated: false,
-      suppressResultRecording: false,
-      invalidationNotice: null,
-      
-      // Actions
-      setGameMode: (gameMode) => set({ gameMode }),
-      setSpellingRepeatMode: (spellingRepeatMode) => set({ spellingRepeatMode }),
-      setMode: (mode) => set({ mode }),
-      setTimeOption: (timeOption) => set({ timeOption, timeLeft: timeOption }),
-      setWordOption: (wordOption) => set({ wordOption }),
-      setLanguage: (language) => set({ language }),
-      setTheme: (theme) => set({ theme }),
-      setWords: (words) => set({ 
-        words, 
-        typedWords: [], 
-        typedChars: words.map(() => []),
-        currentWordIndex: 0,
-        currentCharIndex: 0
-      }),
-      
-      startTest: () => set({ 
-        isTestActive: true, 
-        startTime: Date.now(),
-        timeLeft: get().timeOption
-      }),
-      
-      endTest: () => {
-        const state = get();
-        const endTime = Date.now();
-        const elapsedSeconds = state.startTime ? (endTime - state.startTime) / 1000 : 0;
-        const testDurationSeconds = state.mode === 'time'
-          ? Math.min(state.timeOption, Math.max(0.001, elapsedSeconds || state.timeOption))
-          : Math.max(0.001, elapsedSeconds);
+    (set, get) => {
+      const newWords = () => {
+        const { language, mode, wordOption } = get();
+        return getRandomWords(language, mode === 'time' ? 200 : wordOption);
+      };
 
-        const characterStats = calculateCharacterStats(state.words, state.typedChars);
-        const separatorStats = calculateSeparatorStats(state.words, state.typedChars, state.currentWordIndex);
-        const performanceStats = calculatePerformanceStats(characterStats, testDurationSeconds, 0, {
-          additionalCorrectChars: separatorStats.correctSeparators,
-          additionalTypedChars: separatorStats.typedSeparators,
-        });
-        const validation = validateTestAttempt(state.words, state.typedChars, characterStats, separatorStats, {
-          elapsedSeconds: testDurationSeconds,
-          accuracy: performanceStats.accuracy,
-        });
+      return {
+        gameMode: 'normal',
+        spellingRepeatMode: 'infinite',
+        mode: 'time',
+        timeOption: 30,
+        wordOption: 25,
+        language: 'english',
+        theme: 'aurora',
+        smoothCaret: true,
+        fontSize: 24,
+        restartKeybind: 'tab-enter',
 
-        const finalWpm = validation.isValid ? performanceStats.wpm : 0;
-        const finalRawWpm = validation.isValid ? performanceStats.rawWpm : 0;
-        const finalAccuracy = validation.isValid ? performanceStats.accuracy : 0;
-        
-        const result: TestResult = {
-          wpm: finalWpm,
-          rawWpm: finalRawWpm,
-          accuracy: finalAccuracy,
-          correctChars: characterStats.correctChars,
-          incorrectChars: characterStats.incorrectChars,
-          extraChars: characterStats.extraChars,
-          missedChars: characterStats.missedChars,
-          time: Number(testDurationSeconds.toFixed(2)),
-          mode: state.mode,
-          language: state.language,
-          timeOption: state.mode === 'time' ? state.timeOption : undefined,
-          wordOption: state.mode === 'words' ? state.wordOption : undefined,
-          isValid: validation.isValid,
-          invalidReason: validation.reason ?? undefined,
-          timestamp: Date.now()
-        };
+        ...freshTest([], 30, false),
+        spellLadderStarted: false,
+        spellLadderResetRequest: 0,
 
-        const shouldRecordResult = !state.suppressResultRecording && validation.isValid;
-        const nextInvalidationNotice = !validation.isValid && validation.reason
-          ? { id: Date.now(), reason: validation.reason }
-          : state.invalidationNotice;
-        
-        set({ 
-          isTestActive: false, 
-          isTestComplete: true,
-          endTime,
-          correctChars: characterStats.correctChars,
-          incorrectChars: characterStats.incorrectChars,
-          extraChars: characterStats.extraChars,
-          missedChars: characterStats.missedChars,
-          currentResult: result,
-          results: shouldRecordResult ? [...state.results, result] : state.results,
-          suppressResultRecording: false,
-          invalidationNotice: nextInvalidationNotice
-        });
-      },
-      
-      resetTest: () => {
-        const state = get();
-        const count = state.mode === 'time' ? 200 : state.wordOption;
-        const words = state.suppressResultRecording && state.words.length > 0
-          ? state.words
-          : getRandomWords(state.language, count);
+        results: [],
+        spellLadderResults: [],
 
-        set({
-          isTestActive: false,
-          isTestComplete: false,
-          currentWordIndex: 0,
-          currentCharIndex: 0,
-          words,
-          typedWords: [],
-          typedChars: words.map(() => []),
-          startTime: null,
-          endTime: null,
-          timeLeft: state.timeOption,
-          correctChars: 0,
-          incorrectChars: 0,
-          extraChars: 0,
-          missedChars: 0,
-          currentResult: null,
-          suppressResultRecording: state.suppressResultRecording,
-          invalidationNotice: null
-        });
-      },
+        showSettings: false,
+        showCommandPalette: false,
+        showStatsPanel: false,
+        cloudLastSyncedAt: null,
+        cloudJoinedAt: null,
+        hasHydrated: false,
 
-      exitRetryMode: () => {
-        const state = get();
-        const count = state.mode === 'time' ? 200 : state.wordOption;
-        const words = getRandomWords(state.language, count);
+        setGameMode: (gameMode) => set({ gameMode }),
+        setSpellingRepeatMode: (spellingRepeatMode) => set({ spellingRepeatMode }),
+        setMode: (mode) => set({ mode }),
+        setTimeOption: (timeOption) => set({ timeOption, timeLeft: timeOption }),
+        setWordOption: (wordOption) => set({ wordOption }),
+        setLanguage: (language) => set({ language }),
+        setTheme: (theme) => set({ theme }),
+        setSmoothCaret: (smoothCaret) => set({ smoothCaret }),
+        setFontSize: (fontSize) => set({ fontSize }),
+        setRestartKeybind: (restartKeybind) => set({ restartKeybind }),
 
-        set({
-          isTestActive: false,
-          isTestComplete: false,
-          currentWordIndex: 0,
-          currentCharIndex: 0,
-          words,
-          typedWords: [],
-          typedChars: words.map(() => []),
-          startTime: null,
-          endTime: null,
-          timeLeft: state.timeOption,
-          correctChars: 0,
-          incorrectChars: 0,
-          extraChars: 0,
-          missedChars: 0,
-          currentResult: null,
-          suppressResultRecording: false,
-          invalidationNotice: null
-        });
-      },
+        endTest: () => {
+          const state = get();
+          const elapsedSeconds = state.startTime ? (Date.now() - state.startTime) / 1000 : 0;
+          const testDurationSeconds = state.mode === 'time'
+            ? Math.min(state.timeOption, Math.max(0.001, elapsedSeconds || state.timeOption))
+            : Math.max(0.001, elapsedSeconds);
 
-      retryCurrentTest: () => {
-        const state = get();
-        const words = state.words.length > 0
-          ? state.words
-          : getRandomWords(state.language, state.mode === 'time' ? 200 : state.wordOption);
-
-        set({
-          isTestActive: false,
-          isTestComplete: false,
-          currentWordIndex: 0,
-          currentCharIndex: 0,
-          words,
-          typedWords: [],
-          typedChars: words.map(() => []),
-          startTime: null,
-          endTime: null,
-          timeLeft: state.timeOption,
-          correctChars: 0,
-          incorrectChars: 0,
-          extraChars: 0,
-          missedChars: 0,
-          currentResult: null,
-          suppressResultRecording: true,
-          invalidationNotice: null
-        });
-      },
-      
-      handleKeyPress: (key) => {
-        const state = get();
-        
-        if (state.isTestComplete) return;
-        
-        // Start test on first keypress
-        if (!state.isTestActive && key.length === 1) {
-          set({ isTestActive: true, startTime: Date.now() });
-        }
-        
-        const currentWord = state.words[state.currentWordIndex];
-        if (!currentWord) return;
-        
-        const newTypedChars = [...state.typedChars];
-        const currentWordChars = [...(newTypedChars[state.currentWordIndex] || [])];
-        newTypedChars[state.currentWordIndex] = currentWordChars;
-        
-        if (key === 'Backspace') {
-          if (currentWordChars.length > 0) {
-            currentWordChars.pop();
-            set({ 
-              typedChars: newTypedChars,
-              currentCharIndex: Math.max(0, state.currentCharIndex - 1)
-            });
-          } else if (state.currentWordIndex > 0) {
-            // Go back to previous word
-            const prevWordIndex = state.currentWordIndex - 1;
-            const prevWordChars = newTypedChars[prevWordIndex] || [];
-            set({
-              currentWordIndex: prevWordIndex,
-              currentCharIndex: prevWordChars.length,
-              typedChars: newTypedChars
-            });
-          }
-        } else if (key === ' ') {
-          // Move to next word if current word has characters
-          if (currentWordChars.length > 0) {
-            const nextWordIndex = state.currentWordIndex + 1;
-            
-            // Check if test is complete (words mode)
-            if (state.mode === 'words' && nextWordIndex >= state.wordOption) {
-              get().endTest();
-              return;
-            }
-            
-            if (!newTypedChars[nextWordIndex]) {
-              newTypedChars[nextWordIndex] = [];
-            }
-            
-            set({
-              currentWordIndex: nextWordIndex,
-              currentCharIndex: 0,
-              typedChars: newTypedChars
-            });
-          }
-        } else if (key.length === 1) {
-          const charIndex = currentWordChars.length;
-          const expectedChar = currentWord[charIndex];
-          const isExtra = charIndex >= currentWord.length;
-          const isCorrect = !isExtra && key === expectedChar;
-          
-          currentWordChars.push({
-            char: key,
-            correct: isCorrect,
-            extra: isExtra
+          const characterStats = calculateCharacterStats(state.words, state.typedChars);
+          const separatorStats = calculateSeparatorStats(state.words, state.typedChars, state.currentWordIndex);
+          const performanceStats = calculatePerformanceStats(characterStats, testDurationSeconds, 0, {
+            additionalCorrectChars: separatorStats.correctSeparators,
+            additionalTypedChars: separatorStats.typedSeparators,
+          });
+          const validation = validateTestAttempt(state.words, state.typedChars, characterStats, separatorStats, {
+            elapsedSeconds: testDurationSeconds,
+            accuracy: performanceStats.accuracy,
           });
 
-          const isLastWordInWordsMode =
-            state.mode === 'words' && state.currentWordIndex >= state.wordOption - 1;
-          const isCurrentWordComplete = currentWordChars.length >= currentWord.length;
-
-          if (isLastWordInWordsMode && isCurrentWordComplete) {
-            set({
-              typedChars: newTypedChars,
-              currentCharIndex: charIndex + 1
-            });
-            get().endTest();
-            return;
-          }
-          
-          set({
-            typedChars: newTypedChars,
-            currentCharIndex: charIndex + 1
-          });
-        }
-      },
-      
-      updateTimeLeft: (time) => {
-        set({ timeLeft: time });
-        if (time <= 0 && get().isTestActive) {
-          get().endTest();
-        }
-      },
-      
-      toggleSettings: () => set((state) => ({ showSettings: !state.showSettings })),
-      setShowSettings: (show) => set({ showSettings: show }),
-      toggleCommandPalette: () => set({ showCommandPalette: !get().showCommandPalette }),
-      toggleStatsPanel: () => set({ showStatsPanel: !get().showStatsPanel }),
-      setShowStatsPanel: (show) => set({ showStatsPanel: show }),
-      setSmoothCaret: (smooth) => set({ smoothCaret: smooth }),
-      setCaretStyle: () => set({ caretStyle: 'line' }),
-      setFontSize: (size) => set({ fontSize: size }),
-      setRestartKeybind: (restartKeybind) => set({ restartKeybind }),
-      setHasHydrated: (hasHydrated) => set({ hasHydrated }),
-      setCloudSyncState: (status, pendingCount) =>
-        set((state) => {
-          const isSyncedState = status === 'synced' && pendingCount === 0;
-          const nextCloudLastSyncedAt = isSyncedState
-            ? Date.now()
-            : status === 'idle'
-              ? null
-              : state.cloudLastSyncedAt;
-
-          if (
-            state.cloudSyncStatus === status &&
-            state.cloudSyncPendingCount === pendingCount &&
-            state.cloudLastSyncedAt === nextCloudLastSyncedAt
-          ) {
-            return state;
-          }
-
-          return {
-            cloudSyncStatus: status,
-            cloudSyncPendingCount: pendingCount,
-            cloudLastSyncedAt: nextCloudLastSyncedAt,
+          const result: TestResult = {
+            wpm: validation.isValid ? performanceStats.wpm : 0,
+            rawWpm: validation.isValid ? performanceStats.rawWpm : 0,
+            accuracy: validation.isValid ? performanceStats.accuracy : 0,
+            ...characterStats,
+            time: Number(testDurationSeconds.toFixed(2)),
+            mode: state.mode,
+            language: state.language,
+            timeOption: state.mode === 'time' ? state.timeOption : undefined,
+            wordOption: state.mode === 'words' ? state.wordOption : undefined,
+            isValid: validation.isValid,
+            invalidReason: validation.reason ?? undefined,
+            timestamp: Date.now()
           };
-        }),
-      mergeResults: (incomingResults) =>
-        set((state) => {
-          if (incomingResults.length === 0) {
-            return state;
+
+          const shouldRecordResult = !state.suppressResultRecording && validation.isValid;
+
+          set({
+            isTestActive: false,
+            isTestComplete: true,
+            currentResult: result,
+            results: shouldRecordResult ? [...state.results, result] : state.results,
+            suppressResultRecording: false,
+            invalidationNotice: validation.reason
+              ? { id: Date.now(), reason: validation.reason }
+              : state.invalidationNotice
+          });
+        },
+
+        // In retry mode, restarting replays the same words
+        resetTest: () => {
+          const { suppressResultRecording, words, timeOption } = get();
+          const keepWords = suppressResultRecording && words.length > 0;
+          set(freshTest(keepWords ? words : newWords(), timeOption, suppressResultRecording));
+        },
+
+        exitRetryMode: () => set(freshTest(newWords(), get().timeOption, false)),
+
+        retryCurrentTest: () => {
+          const { words, timeOption } = get();
+          set(freshTest(words.length > 0 ? words : newWords(), timeOption, true));
+        },
+
+        handleKeyPress: (key) => {
+          const state = get();
+
+          if (state.isTestComplete) return;
+
+          // Start test on first keypress
+          if (!state.isTestActive && key.length === 1) {
+            set({ isTestActive: true, startTime: Date.now() });
           }
 
-          const map = new Map<string, TestResult>();
+          const currentWord = state.words[state.currentWordIndex];
+          if (!currentWord) return;
 
-          for (const result of state.results) {
-            map.set(resultToKey(result), result);
+          const newTypedChars = [...state.typedChars];
+          const currentWordChars = [...(newTypedChars[state.currentWordIndex] || [])];
+          newTypedChars[state.currentWordIndex] = currentWordChars;
+
+          if (key === 'Backspace') {
+            if (currentWordChars.length > 0) {
+              currentWordChars.pop();
+              set({ typedChars: newTypedChars });
+            } else if (state.currentWordIndex > 0) {
+              // Go back to previous word
+              set({ currentWordIndex: state.currentWordIndex - 1, typedChars: newTypedChars });
+            }
+          } else if (key === ' ') {
+            // Move to next word if current word has characters
+            if (currentWordChars.length > 0) {
+              const nextWordIndex = state.currentWordIndex + 1;
+
+              if (state.mode === 'words' && nextWordIndex >= state.wordOption) {
+                get().endTest();
+                return;
+              }
+
+              newTypedChars[nextWordIndex] ??= [];
+              set({ currentWordIndex: nextWordIndex, typedChars: newTypedChars });
+            }
+          } else if (key.length === 1) {
+            const charIndex = currentWordChars.length;
+            const isExtra = charIndex >= currentWord.length;
+
+            currentWordChars.push({
+              char: key,
+              correct: !isExtra && key === currentWord[charIndex],
+              extra: isExtra
+            });
+
+            set({ typedChars: newTypedChars });
+
+            const isLastWordInWordsMode =
+              state.mode === 'words' && state.currentWordIndex >= state.wordOption - 1;
+            if (isLastWordInWordsMode && currentWordChars.length >= currentWord.length) {
+              get().endTest();
+            }
           }
+        },
 
-          for (const result of incomingResults) {
-            map.set(resultToKey(result), result);
+        updateTimeLeft: (time) => {
+          set({ timeLeft: time });
+          if (time <= 0 && get().isTestActive) {
+            get().endTest();
           }
+        },
 
-          const merged = [...map.values()].sort((a, b) => a.timestamp - b.timestamp);
+        toggleSettings: () => set((state) => ({ showSettings: !state.showSettings })),
+        setShowSettings: (showSettings) => set({ showSettings }),
+        toggleCommandPalette: () => set((state) => ({ showCommandPalette: !state.showCommandPalette })),
+        toggleStatsPanel: () => set((state) => ({ showStatsPanel: !state.showStatsPanel })),
+        setShowStatsPanel: (showStatsPanel) => set({ showStatsPanel }),
+        setCloudLastSyncedAt: (cloudLastSyncedAt) => set({ cloudLastSyncedAt }),
+        setCloudJoinedAt: (cloudJoinedAt) => set({ cloudJoinedAt }),
+        setHasHydrated: () => set({ hasHydrated: true }),
+        mergeResults: (incomingResults) =>
+          set((state) => {
+            const map = new Map(state.results.map((result) => [resultIdentity(result), result]));
+            let added = false;
 
-          return { results: merged };
-        }),
-      addResult: (result) => set({ results: [...get().results, result] }),
-      addSpellLadderResult: (result) => set({ spellLadderResults: [...get().spellLadderResults, result] }),
-      clearHistory: () => set({ results: [], spellLadderResults: [] }),
-      setInvalidationNotice: (reason) => set({ invalidationNotice: { id: Date.now(), reason } }),
-      clearInvalidationNotice: () => set({ invalidationNotice: null })
-    }),
+            for (const result of incomingResults) {
+              const key = resultIdentity(result);
+              if (!map.has(key)) {
+                map.set(key, result);
+                added = true;
+              }
+            }
+
+            if (!added) return state;
+            return { results: [...map.values()].sort((a, b) => a.timestamp - b.timestamp) };
+          }),
+        addSpellLadderResult: (result) => set((state) => ({ spellLadderResults: [...state.spellLadderResults, result] })),
+        clearHistory: () => set({ results: [], spellLadderResults: [] }),
+        setInvalidationNotice: (reason) => set({ invalidationNotice: { id: Date.now(), reason } }),
+        clearInvalidationNotice: () => set({ invalidationNotice: null }),
+        setSpellLadderStarted: (spellLadderStarted) => set({ spellLadderStarted }),
+        requestSpellLadderReset: () => set((state) => ({ spellLadderResetRequest: state.spellLadderResetRequest + 1 }))
+      };
+    },
     {
       name: 'pengutype-storage',
       merge: (persistedState, currentState) => {
-        const incomingState = (persistedState as Partial<TypingState>) ?? {};
-        const mergedState = { ...currentState, ...incomingState };
-
-        const incomingTheme = incomingState.theme;
-        const incomingLanguage = incomingState.language;
-        const incomingGameMode = (incomingState as { gameMode?: string }).gameMode;
-
-        const safeTheme =
-          typeof incomingTheme === 'string' && incomingTheme in themes
-            ? (incomingTheme as ThemeKey)
-            : currentState.theme;
-
-        const safeLanguage =
-          typeof incomingLanguage === 'string' && incomingLanguage in languages
-            ? (incomingLanguage as LanguageKey)
-            : currentState.language;
+        const incoming = (persistedState ?? {}) as Partial<Omit<TypingState, 'gameMode'>> & { gameMode?: string };
+        const merged = { ...currentState, ...incoming };
 
         return {
-          ...mergedState,
-          theme: safeTheme,
-          language: safeLanguage,
-          caretStyle: 'line',
-          gameMode: incomingGameMode === 'spell-climb' ? 'spell-ladder' : mergedState.gameMode,
+          ...merged,
+          theme: incoming.theme && incoming.theme in themes ? incoming.theme : currentState.theme,
+          language: incoming.language && incoming.language in languages ? incoming.language : currentState.language,
+          // legacy name
+          gameMode: (incoming.gameMode === 'spell-climb' ? 'spell-ladder' : merged.gameMode) as GameMode,
+          // older versions stored duplicate cloud copies of the same test
+          results: dedupeResults(merged.results ?? []),
         };
       },
       partialize: (state) => ({
@@ -550,31 +368,27 @@ export const useTypingStore = create<TypingState>()(
         language: state.language,
         theme: state.theme,
         smoothCaret: state.smoothCaret,
-        caretStyle: state.caretStyle,
         fontSize: state.fontSize,
         restartKeybind: state.restartKeybind,
         results: state.results,
         spellLadderResults: state.spellLadderResults
       }),
-      onRehydrateStorage: () => (state, error) => {
-        if (!error) {
-          const themeKey = state?.theme;
-          if (themeKey && !(themeKey in themes)) {
-            state?.setTheme('aurora');
-          }
-          const languageKey = state?.language;
-          if (languageKey && !(languageKey in languages)) {
-            state?.setLanguage('english');
-          }
-          if (state?.caretStyle !== 'line') {
-            state?.setCaretStyle('line');
-          }
-          if ((state as { gameMode?: string } | undefined)?.gameMode === 'spell-climb') {
-            state?.setGameMode('spell-ladder');
-          }
-          state?.setHasHydrated(true);
-        }
+      // runs synchronously inside create(), so useTypingStore isn't assigned yet
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated();
       }
     }
   )
 );
+
+function dedupeResults(results: TestResult[]): TestResult[] {
+  const map = new Map<string, TestResult>();
+  for (const result of results) {
+    const key = resultIdentity(result);
+    // prefer the local copy (it carries isValid and precise time)
+    if (!map.has(key) || result.isValid !== undefined) {
+      map.set(key, result);
+    }
+  }
+  return [...map.values()];
+}
