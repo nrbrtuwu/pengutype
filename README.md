@@ -49,10 +49,10 @@ npm run build
 npm run start
 ```
 
-### 5) Lint
+### 5) Typecheck
 
 ```bash
-npm run lint
+npm run typecheck
 ```
 
 ## Project Structure
@@ -62,12 +62,10 @@ app/                # App Router pages/layout
 components/         # UI + feature components
 languages/          # JSON wordlists
 lib/                # Store, words utilities, themes
-public/             # Static assets (icons, etc.)
 ```
 
 ## Notes
 
-- This repo includes both `package-lock.json` and `pnpm-lock.yaml`, but the project is fully runnable with **npm** commands above.
 - Stats are grouped by exact test bucket:
   - Time mode: duration + language (e.g. 60s + English)
   - Words mode: word count + language (e.g. 25 words + English)

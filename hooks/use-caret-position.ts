@@ -1,10 +1,7 @@
 import { RefObject, useCallback, useEffect, useLayoutEffect, useState } from "react";
 
-export type CaretStyle = "line";
-
 interface UseCaretPositionParams {
   wordsRef: RefObject<HTMLDivElement | null>;
-  caretStyle: CaretStyle;
   fontSize: number;
   typedChars: { char: string; correct: boolean; extra?: boolean }[][];
   currentWordIndex: number;
@@ -13,7 +10,6 @@ interface UseCaretPositionParams {
 
 export function useCaretPosition({
   wordsRef,
-  caretStyle,
   fontSize,
   typedChars,
   currentWordIndex,
@@ -41,7 +37,7 @@ export function useCaretPosition({
     const anchorRect = anchor.getBoundingClientRect();
 
     const left = anchorRect.left - containerRect.left + container.scrollLeft;
-    let top =
+    const top =
       anchorRect.top -
       containerRect.top +
       container.scrollTop +
@@ -55,11 +51,11 @@ export function useCaretPosition({
     });
 
     setIsCaretReady(true);
-  }, [caretHeight, caretStyle, wordsRef]);
+  }, [caretHeight, wordsRef]);
 
   useLayoutEffect(() => {
     requestAnimationFrame(updateCaretPosition);
-  }, [updateCaretPosition, typedChars, currentWordIndex, words, fontSize, caretStyle]);
+  }, [updateCaretPosition, typedChars, currentWordIndex, words, fontSize]);
 
   useEffect(() => {
     if (!wordsRef.current) return;

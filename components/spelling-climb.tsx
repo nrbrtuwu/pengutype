@@ -18,7 +18,6 @@ export function SpellingClimb() {
     theme,
     restartKeybind,
     smoothCaret,
-    caretStyle,
     fontSize,
     timeOption,
     spellingRepeatMode,
@@ -245,7 +244,6 @@ export function SpellingClimb() {
 
   const { caretPosition, isCaretReady } = useCaretPosition({
     wordsRef,
-    caretStyle,
     fontSize: wordFontSize,
     typedChars: caretTypedChars,
     currentWordIndex: 0,
@@ -752,7 +750,6 @@ export function SpellingClimb() {
                   <AnimatedCaret
                     caretPosition={caretPosition}
                     smoothCaret={smoothCaret}
-                    caretStyle={caretStyle}
                     fontSize={wordFontSize}
                     theme={theme}
                   />

@@ -139,7 +139,12 @@ export function Results() {
   if (!isTestComplete) return null;
 
   return (
-    <div className="w-full max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="w-full max-w-4xl mx-auto"
+    >
       {typeof document !== "undefined" &&
         createPortal(
           <AnimatePresence>
@@ -432,6 +437,6 @@ export function Results() {
           {" to restart"}
         </span>
       </div>
-    </div>
+    </motion.div>
   );
 }

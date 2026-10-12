@@ -2,12 +2,10 @@
 
 import { motion } from "framer-motion";
 import { themes, ThemeKey } from "@/lib/themes";
-import { CaretStyle } from "@/hooks/use-caret-position";
 
 interface AnimatedCaretProps {
   caretPosition: { x: number; y: number };
   smoothCaret: boolean;
-  caretStyle: CaretStyle;
   fontSize: number;
   theme: ThemeKey;
 }
@@ -15,7 +13,6 @@ interface AnimatedCaretProps {
 export function AnimatedCaret({
   caretPosition,
   smoothCaret,
-  caretStyle: _caretStyle,
   fontSize,
   theme,
 }: AnimatedCaretProps) {

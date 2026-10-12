@@ -77,7 +77,7 @@ export default function RootLayout({
 `;
 
   return (
-    <html lang="en" className="dark">
+    <html lang="en">
       <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
         <Script id="favicon-theme-bootstrap" strategy="beforeInteractive">
           {faviconBootScript}

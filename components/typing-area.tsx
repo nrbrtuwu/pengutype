@@ -138,7 +138,6 @@ export function TypingArea() {
     handleKeyPress,
     theme,
     smoothCaret,
-    caretStyle,
     fontSize,
   } = useTypingStore();
   const currentTheme = themes[theme];
@@ -148,7 +147,6 @@ export function TypingArea() {
   const effectiveFontSize = Math.round(fontSize * 1.5);
   const { caretPosition, isCaretReady } = useCaretPosition({
     wordsRef,
-    caretStyle,
     fontSize: effectiveFontSize,
     typedChars,
     currentWordIndex,
@@ -267,7 +265,6 @@ export function TypingArea() {
           <AnimatedCaret
             caretPosition={caretPosition}
             smoothCaret={smoothCaret}
-            caretStyle={caretStyle}
             fontSize={effectiveFontSize}
             theme={theme}
           />

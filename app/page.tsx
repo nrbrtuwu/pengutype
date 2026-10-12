@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { TypingTest } from "@/components/typing-test";
@@ -18,12 +19,12 @@ export default function Home() {
     return null;
   }
 
-  const currentTheme = themes[theme] ?? themes.aurora;
+  const currentTheme = themes[theme];
 
   return (
-    <main 
-      className="min-h-screen transition-colors duration-500 relative overflow-hidden noise"
-      style={{ backgroundColor: currentTheme.background }}
+    <main
+      className="min-h-screen transition-colors duration-500 relative overflow-hidden"
+      style={{ backgroundColor: currentTheme.background, "--theme-bg": currentTheme.background } as CSSProperties}
     >
       <AnimatedBackground />
       <HistoryBackupSync />
