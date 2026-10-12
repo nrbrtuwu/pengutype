@@ -121,7 +121,7 @@ npm run db:down
 
 - API route: `GET/POST /api/results`
 - Table `typing_results` is auto-created on first request.
-- The app syncs local test results in the background using a local anonymous device ID.
+- When signed in with Discord, the app pulls your cloud personal bests and uploads new local bests in the background. The API only reads/writes the signed-in user's results.
 
 This gives you cloud history backups now and a clean base for Discord-auth accounts and leaderboards later.
 
