@@ -15,6 +15,9 @@ export const authOptions: NextAuthOptions = {
 			clientId: process.env.AUTH_DISCORD_ID ?? process.env.DISCORD_CLIENT_ID ?? "",
 			clientSecret: process.env.AUTH_DISCORD_SECRET ?? process.env.DISCORD_CLIENT_SECRET ?? "",
 			authorization: { params: { scope: "identify" } },
+			// Discord now adds `iss=https://discord.com` to the OAuth callback (RFC 9207). openid-client then
+			// requires a configured issuer to check it against, and fails the sign-in without one.
+			issuer: "https://discord.com",
 		}),
 	],
 	session: { strategy: "jwt" },
