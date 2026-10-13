@@ -3,7 +3,8 @@ import { persist } from 'zustand/middleware';
 import { getRandomWords } from '@/lib/words';
 import { languages } from '@/languages';
 import type { LanguageKey } from '@/languages';
-import { ThemeKey, themes } from './themes';
+import { MODS, type ModKey } from './mods';
+import { DEFAULT_THEME, LEGACY_THEME_KEYS, ThemeKey, themes } from './themes';
 import { calculateCharacterStats, calculatePerformanceStats, calculateSeparatorStats, validateTestAttempt, type TypedCharacter } from './typing-metrics';
 
 export type TestMode = 'time' | 'words';
@@ -12,6 +13,36 @@ export type SpellingRepeatMode = 'single' | 'infinite';
 export type TimeOption = 15 | 30 | 60 | 120;
 export type WordOption = 10 | 25 | 50 | 100;
 export type RestartKeybind = 'tab-enter' | 'tab';
+export type CaretStyle = 'line' | 'block' | 'underline';
+
+/** Quality-of-life preferences, changed through updateSettings(). */
+export interface QolSettings {
+  caretStyle: CaretStyle;
+  /** lines of words visible in the typing area */
+  visibleLines: 2 | 3 | 4;
+  /** hide mistakes while typing */
+  blindMode: boolean;
+  /** allow backspacing into words that were typed correctly */
+  freedomMode: boolean;
+  /** hide header/footer while typing; mouse movement brings them back */
+  focusMode: boolean;
+  showLiveTimer: boolean;
+  showLiveWpm: boolean;
+  showLiveAccuracy: boolean;
+  showConfetti: boolean;
+}
+
+const DEFAULT_QOL_SETTINGS: QolSettings = {
+  caretStyle: 'line',
+  visibleLines: 3,
+  blindMode: false,
+  freedomMode: true,
+  focusMode: false,
+  showLiveTimer: true,
+  showLiveWpm: true,
+  showLiveAccuracy: true,
+  showConfetti: true,
+};
 
 export const TIME_OPTIONS: TimeOption[] = [15, 30, 60, 120];
 export const WORD_OPTIONS: WordOption[] = [10, 25, 50, 100];
@@ -31,6 +62,8 @@ export interface TestResult {
   wordOption?: WordOption;
   isValid?: boolean;
   invalidReason?: string;
+  /** active mods; runs with mods aren't recorded */
+  mods?: ModKey[];
   timestamp: number;
 }
 
@@ -45,7 +78,7 @@ export interface SpellLadderResult {
   timestamp: number;
 }
 
-interface TypingState {
+interface TypingState extends QolSettings {
   // Settings
   gameMode: GameMode;
   spellingRepeatMode: SpellingRepeatMode;
@@ -57,6 +90,7 @@ interface TypingState {
   smoothCaret: boolean;
   fontSize: number;
   restartKeybind: RestartKeybind;
+  mods: ModKey[];
 
   // Test state
   isTestActive: boolean;
@@ -79,9 +113,7 @@ interface TypingState {
   spellLadderResults: SpellLadderResult[];
 
   // UI
-  showSettings: boolean;
   showCommandPalette: boolean;
-  showStatsPanel: boolean;
   cloudLastSyncedAt: number | null;
   cloudJoinedAt: string | null;
   hasHydrated: boolean;
@@ -97,21 +129,22 @@ interface TypingState {
   setSmoothCaret: (smooth: boolean) => void;
   setFontSize: (size: number) => void;
   setRestartKeybind: (keybind: RestartKeybind) => void;
-  endTest: () => void;
+  updateSettings: (settings: Partial<QolSettings>) => void;
+  /** `failReason` ends the test as a fail (e.g. sudden death) */
+  endTest: (failReason?: string) => void;
+  toggleMod: (mod: ModKey) => void;
+  clearMods: () => void;
   resetTest: () => void;
   exitRetryMode: () => void;
   retryCurrentTest: () => void;
   handleKeyPress: (key: string) => void;
   updateTimeLeft: (time: number) => void;
-  toggleSettings: () => void;
-  setShowSettings: (show: boolean) => void;
   toggleCommandPalette: () => void;
-  toggleStatsPanel: () => void;
-  setShowStatsPanel: (show: boolean) => void;
   setCloudLastSyncedAt: (timestamp: number | null) => void;
   setCloudJoinedAt: (joinedAt: string | null) => void;
   setHasHydrated: () => void;
   mergeResults: (incomingResults: TestResult[]) => void;
+  mergeSpellLadderResults: (incomingResults: SpellLadderResult[]) => void;
   addSpellLadderResult: (result: SpellLadderResult) => void;
   clearHistory: () => void;
   setInvalidationNotice: (reason: string) => void;
@@ -123,6 +156,15 @@ interface TypingState {
 /** Identity of a test for de-duplication. Cloud copies lack isValid and have rounded times, so only stable fields are used. */
 function resultIdentity(result: TestResult): string {
   return `${result.timestamp}|${result.mode}|${result.language}`;
+}
+
+function pickQolSettings(state: QolSettings): QolSettings {
+  const keys = Object.keys(DEFAULT_QOL_SETTINGS) as (keyof QolSettings)[];
+  return Object.fromEntries(keys.map((key) => [key, state[key]])) as unknown as QolSettings;
+}
+
+function isWordCorrect(word: string | undefined, typed: TypedCharacter[] | undefined): boolean {
+  return !!word && !!typed && typed.length === word.length && typed.every((c) => c.correct && !c.extra);
 }
 
 function freshTest(words: string[], timeOption: TimeOption, suppressResultRecording: boolean) {
@@ -155,10 +197,12 @@ export const useTypingStore = create<TypingState>()(
         timeOption: 30,
         wordOption: 25,
         language: 'english',
-        theme: 'aurora',
+        theme: DEFAULT_THEME,
         smoothCaret: true,
         fontSize: 24,
         restartKeybind: 'tab-enter',
+        ...DEFAULT_QOL_SETTINGS,
+        mods: [],
 
         ...freshTest([], 30, false),
         spellLadderStarted: false,
@@ -167,9 +211,7 @@ export const useTypingStore = create<TypingState>()(
         results: [],
         spellLadderResults: [],
 
-        showSettings: false,
         showCommandPalette: false,
-        showStatsPanel: false,
         cloudLastSyncedAt: null,
         cloudJoinedAt: null,
         hasHydrated: false,
@@ -184,24 +226,34 @@ export const useTypingStore = create<TypingState>()(
         setSmoothCaret: (smoothCaret) => set({ smoothCaret }),
         setFontSize: (fontSize) => set({ fontSize }),
         setRestartKeybind: (restartKeybind) => set({ restartKeybind }),
+        updateSettings: (settings) => set(settings),
+        clearMods: () => set({ mods: [] }),
+        toggleMod: (mod) =>
+          set((state) => ({
+            mods: state.mods.includes(mod)
+              ? state.mods.filter((m) => m !== mod)
+              : [...state.mods, mod],
+          })),
 
-        endTest: () => {
+        endTest: (failReason) => {
           const state = get();
           const elapsedSeconds = state.startTime ? (Date.now() - state.startTime) / 1000 : 0;
           const testDurationSeconds = state.mode === 'time'
             ? Math.min(state.timeOption, Math.max(0.001, elapsedSeconds || state.timeOption))
             : Math.max(0.001, elapsedSeconds);
 
-          const characterStats = calculateCharacterStats(state.words, state.typedChars);
+          const characterStats = calculateCharacterStats(state.words, state.typedChars, state.currentWordIndex);
           const separatorStats = calculateSeparatorStats(state.words, state.typedChars, state.currentWordIndex);
           const performanceStats = calculatePerformanceStats(characterStats, testDurationSeconds, 0, {
             additionalCorrectChars: separatorStats.correctSeparators,
             additionalTypedChars: separatorStats.typedSeparators,
           });
-          const validation = validateTestAttempt(state.words, state.typedChars, characterStats, separatorStats, {
-            elapsedSeconds: testDurationSeconds,
-            accuracy: performanceStats.accuracy,
-          });
+          const validation = failReason
+            ? { isValid: false, reason: failReason }
+            : validateTestAttempt(state.words, state.typedChars, characterStats, separatorStats, {
+                elapsedSeconds: testDurationSeconds,
+                accuracy: performanceStats.accuracy,
+              });
 
           const result: TestResult = {
             wpm: validation.isValid ? performanceStats.wpm : 0,
@@ -215,10 +267,12 @@ export const useTypingStore = create<TypingState>()(
             wordOption: state.mode === 'words' ? state.wordOption : undefined,
             isValid: validation.isValid,
             invalidReason: validation.reason ?? undefined,
+            mods: state.mods.length > 0 ? state.mods : undefined,
             timestamp: Date.now()
           };
 
-          const shouldRecordResult = !state.suppressResultRecording && validation.isValid;
+          // Retries and mod runs are unranked
+          const shouldRecordResult = !state.suppressResultRecording && validation.isValid && state.mods.length === 0;
 
           set({
             isTestActive: false,
@@ -267,16 +321,23 @@ export const useTypingStore = create<TypingState>()(
             if (currentWordChars.length > 0) {
               currentWordChars.pop();
               set({ typedChars: newTypedChars });
-            } else if (state.currentWordIndex > 0) {
-              // Go back to previous word
+            } else if (state.currentWordIndex > 0 && (state.freedomMode || !isWordCorrect(state.words[state.currentWordIndex - 1], newTypedChars[state.currentWordIndex - 1]))) {
+              // Go back to previous word (without freedom mode, only to fix a mistyped one)
               set({ currentWordIndex: state.currentWordIndex - 1, typedChars: newTypedChars });
             }
           } else if (key === ' ') {
             // Move to next word if current word has characters
             if (currentWordChars.length > 0) {
+              if (state.mods.includes('sudden-death') && currentWordChars.length < currentWord.length) {
+                get().endTest('sudden death: skipped letters');
+                return;
+              }
+
               const nextWordIndex = state.currentWordIndex + 1;
 
               if (state.mode === 'words' && nextWordIndex >= state.wordOption) {
+                // move past the last word so letters skipped with space count as missed
+                set({ currentWordIndex: nextWordIndex, typedChars: newTypedChars });
                 get().endTest();
                 return;
               }
@@ -296,6 +357,12 @@ export const useTypingStore = create<TypingState>()(
 
             set({ typedChars: newTypedChars });
 
+            const lastTyped = currentWordChars[currentWordChars.length - 1];
+            if (state.mods.includes('sudden-death') && (!lastTyped.correct || lastTyped.extra)) {
+              get().endTest('sudden death: wrong letter');
+              return;
+            }
+
             const isLastWordInWordsMode =
               state.mode === 'words' && state.currentWordIndex >= state.wordOption - 1;
             if (isLastWordInWordsMode && currentWordChars.length >= currentWord.length) {
@@ -311,11 +378,7 @@ export const useTypingStore = create<TypingState>()(
           }
         },
 
-        toggleSettings: () => set((state) => ({ showSettings: !state.showSettings })),
-        setShowSettings: (showSettings) => set({ showSettings }),
         toggleCommandPalette: () => set((state) => ({ showCommandPalette: !state.showCommandPalette })),
-        toggleStatsPanel: () => set((state) => ({ showStatsPanel: !state.showStatsPanel })),
-        setShowStatsPanel: (showStatsPanel) => set({ showStatsPanel }),
         setCloudLastSyncedAt: (cloudLastSyncedAt) => set({ cloudLastSyncedAt }),
         setCloudJoinedAt: (cloudJoinedAt) => set({ cloudJoinedAt }),
         setHasHydrated: () => set({ hasHydrated: true }),
@@ -335,6 +398,13 @@ export const useTypingStore = create<TypingState>()(
             if (!added) return state;
             return { results: [...map.values()].sort((a, b) => a.timestamp - b.timestamp) };
           }),
+        mergeSpellLadderResults: (incomingResults) =>
+          set((state) => {
+            const seen = new Set(state.spellLadderResults.map((result) => result.timestamp));
+            const added = incomingResults.filter((result) => !seen.has(result.timestamp));
+            if (added.length === 0) return state;
+            return { spellLadderResults: [...state.spellLadderResults, ...added].sort((a, b) => a.timestamp - b.timestamp) };
+          }),
         addSpellLadderResult: (result) => set((state) => ({ spellLadderResults: [...state.spellLadderResults, result] })),
         clearHistory: () => set({ results: [], spellLadderResults: [] }),
         setInvalidationNotice: (reason) => set({ invalidationNotice: { id: Date.now(), reason } }),
@@ -346,17 +416,20 @@ export const useTypingStore = create<TypingState>()(
     {
       name: 'pengutype-storage',
       merge: (persistedState, currentState) => {
-        const incoming = (persistedState ?? {}) as Partial<Omit<TypingState, 'gameMode'>> & { gameMode?: string };
+        const incoming = (persistedState ?? {}) as Partial<Omit<TypingState, 'gameMode' | 'theme'>> & { gameMode?: string; theme?: string };
         const merged = { ...currentState, ...incoming };
+        const incomingTheme = incoming.theme && (LEGACY_THEME_KEYS[incoming.theme] ?? incoming.theme);
 
         return {
           ...merged,
-          theme: incoming.theme && incoming.theme in themes ? incoming.theme : currentState.theme,
+          // removed themes fall back to the default
+          theme: incomingTheme && incomingTheme in themes ? (incomingTheme as ThemeKey) : currentState.theme,
           language: incoming.language && incoming.language in languages ? incoming.language : currentState.language,
           // legacy name
           gameMode: (incoming.gameMode === 'spell-climb' ? 'spell-ladder' : merged.gameMode) as GameMode,
           // older versions stored duplicate cloud copies of the same test
           results: dedupeResults(merged.results ?? []),
+          mods: (merged.mods ?? []).filter((mod) => mod in MODS),
         };
       },
       partialize: (state) => ({
@@ -370,6 +443,8 @@ export const useTypingStore = create<TypingState>()(
         smoothCaret: state.smoothCaret,
         fontSize: state.fontSize,
         restartKeybind: state.restartKeybind,
+        ...pickQolSettings(state),
+        mods: state.mods,
         results: state.results,
         spellLadderResults: state.spellLadderResults
       }),

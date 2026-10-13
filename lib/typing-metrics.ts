@@ -21,7 +21,15 @@ export type TestValidationResult = {
   reason: string | null;
 };
 
-export function calculateCharacterStats(words: string[], typedChars: TypedCharacter[][]): CharacterStats {
+/**
+ * Counts typed letters by outcome. Untyped letters only count as missed for words the user already moved past
+ * (`currentWordIndex`), so a half-typed word in progress doesn't lower accuracy.
+ */
+export function calculateCharacterStats(
+  words: string[],
+  typedChars: TypedCharacter[][],
+  currentWordIndex: number
+): CharacterStats {
   let correctChars = 0;
   let incorrectChars = 0;
   let extraChars = 0;
@@ -41,7 +49,7 @@ export function calculateCharacterStats(words: string[], typedChars: TypedCharac
       }
     }
 
-    if (wordChars.length > 0) {
+    if (index < currentWordIndex && wordChars.length > 0) {
       const nonExtraTypedCount = Math.min(wordChars.length, originalWord.length);
       if (nonExtraTypedCount < originalWord.length) {
         missedChars += originalWord.length - nonExtraTypedCount;
@@ -55,6 +63,16 @@ export function calculateCharacterStats(words: string[], typedChars: TypedCharac
     extraChars,
     missedChars,
   };
+}
+
+/** Words before `currentWordIndex` that were typed exactly right. */
+export function countCorrectWords(words: string[], typedChars: TypedCharacter[][], currentWordIndex: number): number {
+  let count = 0;
+  for (let index = 0; index < currentWordIndex; index++) {
+    const typed = typedChars[index] ?? [];
+    if (typed.length === words[index]?.length && typed.every((c) => c.correct && !c.extra)) count++;
+  }
+  return count;
 }
 
 export function calculateSeparatorStats(

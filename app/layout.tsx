@@ -2,8 +2,9 @@ import type { Metadata, Viewport } from 'next'
 import { JetBrains_Mono, Inter } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { AuthSessionProvider } from '@/components/auth-session-provider'
-import { DynamicFavicon } from '@/components/dynamic-favicon'
-import { FAVICON_LINK_ID, faviconHrefs } from '@/lib/favicon'
+import { ThemeSync } from '@/components/theme-sync'
+import { AppShell } from '@/components/app-shell'
+import { defaultThemeStyle, themeBootScript } from '@/lib/theme-dom'
 import './globals.css'
 
 const inter = Inter({
@@ -18,23 +19,13 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: 'pengutype',
-  description: 'a sleek, customizable typing test to measure your speed and accuracy. multiple languages, themes, and modes.',
+  description: 'a minimal, customizable typing test to measure your speed and accuracy. multiple languages, themes, and modes.',
 }
 
 export const viewport: Viewport = {
-  themeColor: '#1e1e2e',
   width: 'device-width',
   initialScale: 1,
 }
-
-// Set the themed favicon before hydration so the tab icon doesn't flash the default theme
-const faviconBootScript = `(() => {
-  try {
-    const hrefs = ${JSON.stringify(faviconHrefs)};
-    const theme = JSON.parse(localStorage.getItem('pengutype-storage'))?.state?.theme;
-    if (hrefs[theme]) document.getElementById('${FAVICON_LINK_ID}').href = hrefs[theme];
-  } catch {}
-})();`;
 
 export default function RootLayout({
   children,
@@ -42,15 +33,15 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    // the boot script rewrites the theme variables before hydration
+    <html lang="en" style={defaultThemeStyle} suppressHydrationWarning>
       <head>
-        <link id={FAVICON_LINK_ID} rel="icon" type="image/svg+xml" href={faviconHrefs.aurora} />
-        <script dangerouslySetInnerHTML={{ __html: faviconBootScript }} />
+        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
       </head>
       <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
         <AuthSessionProvider>
-          <DynamicFavicon />
-          {children}
+          <ThemeSync />
+          <AppShell>{children}</AppShell>
         </AuthSessionProvider>
         <Analytics />
       </body>

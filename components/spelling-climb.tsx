@@ -2,30 +2,33 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Clock3, Type, Target, AlertCircle } from "lucide-react";
 import { useTypingStore } from "@/lib/store";
-import { themes } from "@/lib/themes";
 import { getSpellingChain } from "@/lib/words";
 import { useCaretPosition } from "@/hooks/use-caret-position";
 import { AnimatedCaret } from "./animated-caret";
-import { CharBreakdown, DetailItem, NewBestCelebration, RestartHint, ResultActions, StatTile } from "./result-parts";
+import { FunStage } from "./fun-stage";
+import { isModalOpen } from "./picker-modal";
+import { CaretAnchor } from "./typing-area";
+import { CharBreakdown, DetailItem, ModBadges, NewBestCelebration, RestartHint, ResultActions, StatTile } from "./result-parts";
 
 export function SpellingClimb() {
   const {
     language,
-    theme,
     restartKeybind,
     smoothCaret,
     fontSize,
+    caretStyle,
+    blindMode,
+    showLiveTimer,
     timeOption,
     spellingRepeatMode,
     setInvalidationNotice,
     addSpellLadderResult,
     spellLadderResults,
     spellLadderResetRequest,
+    mods,
     setSpellLadderStarted,
   } = useTypingStore();
-  const currentTheme = themes[theme];
   const wordsRef = useRef<HTMLDivElement>(null);
   const wordFontSize = Math.max(42, Math.round(fontSize * 3));
 
@@ -97,6 +100,12 @@ export function SpellingClimb() {
     const isValidRun = !isInvalidated;
     let shouldCelebrate = false;
 
+    // mod runs are unranked
+    if (mods.length > 0) {
+      hasRecordedResultRef.current = true;
+      return;
+    }
+
     if (spellingRepeatMode === "single") {
       if (singleRunCompleted && isValidRun) {
         const previousFastestTime = spellLadderResults
@@ -156,6 +165,7 @@ export function SpellingClimb() {
     isComplete,
     isInvalidated,
     language,
+    mods.length,
     spellLadderResults,
     singleRunCompleted,
     spellingRepeatMode,
@@ -243,57 +253,25 @@ export function SpellingClimb() {
 
     const characters = currentWord.split("").map((char, index) => {
       const typedChar = typed[index];
-      const isTyped = typedChar !== undefined;
-      const isCorrect = isTyped && typedChar.toLowerCase() === char.toLowerCase();
-
+      const color =
+        typedChar === undefined ? "text-sub" : blindMode || typedChar.toLowerCase() === char.toLowerCase() ? "text-text" : "text-error";
       return (
-        <span
-          key={`char-${index}`}
-          style={{
-            color: isTyped
-              ? isCorrect
-                ? currentTheme.primary
-                : currentTheme.incorrect
-              : currentTheme.missing,
-          }}
-        >
+        <span key={index} className={color}>
           {char}
         </span>
       );
     });
 
-    const caretIndex = Math.min(typed.length, currentWord.length);
-    characters.splice(
-      caretIndex,
-      0,
-      <span
-        key="caret-anchor"
-        data-caret-anchor
-        aria-hidden
-        className="inline-block align-baseline"
-        style={{
-          width: 0,
-          height: "1em",
-          margin: 0,
-          padding: 0,
-          pointerEvents: "none",
-        }}
-      />
-    );
+    characters.splice(Math.min(typed.length, currentWord.length), 0, <CaretAnchor key="caret-anchor" />);
     return characters;
-  }, [
-    currentWord,
-    typed,
-    currentTheme.primary,
-    currentTheme.incorrect,
-    currentTheme.missing,
-  ]);
+  }, [currentWord, typed, blindMode]);
 
   useEffect(() => {
     let isTabDown = false;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       const key = event.key;
+      if (isModalOpen()) return;
 
       if (key === "Tab") {
         event.preventDefault();
@@ -363,6 +341,16 @@ export function SpellingClimb() {
         setCorrectChars((prev) => prev + 1);
       } else {
         setIncorrectChars((prev) => prev + 1);
+
+        if (mods.includes("sudden-death")) {
+          setTyped(nextTyped);
+          setIsActive(false);
+          setIsComplete(true);
+          setIsInvalidated(true);
+          setCompletedAt(Date.now());
+          setInvalidationNotice("sudden death: wrong letter");
+          return;
+        }
       }
 
       if (nextTyped.length < currentWord.length) {
@@ -429,6 +417,8 @@ export function SpellingClimb() {
     queuedChain,
     generateChain,
     wordChain,
+    mods,
+    setInvalidationNotice,
   ]);
 
   const elapsedSeconds = Math.max(0, timeOption - timeLeft);
@@ -450,136 +440,62 @@ export function SpellingClimb() {
   return (
     <div className="w-full max-w-4xl mx-auto">
       {!isComplete && (
-        <div className="mb-8 h-[56px] flex items-center justify-center" aria-hidden={!isActive}>
+        <div className="mb-8 h-10 flex items-end justify-center gap-6 font-mono" aria-hidden={!isActive}>
           {isActive && (
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-              className="flex items-center justify-center gap-4"
-            >
-              <div
-                className="flex items-center gap-2 px-4 py-2 rounded-xl"
-                style={{
-                  backgroundColor: `${currentTheme.background}dd`,
-                  border: `1px solid ${currentTheme.sub}33`,
-                }}
-              >
-                <Clock3 size={18} style={{ color: currentTheme.primary }} />
-                <span className="text-2xl font-mono font-bold" style={{ color: currentTheme.primary }}>
-                  {timeLeft}
-                </span>
-                <span className="text-xs" style={{ color: currentTheme.sub }}>
-                  s
-                </span>
-              </div>
-
-              <div
-                className="flex items-center gap-2 px-4 py-2 rounded-xl"
-                style={{
-                  backgroundColor: `${currentTheme.background}dd`,
-                  border: `1px solid ${currentTheme.sub}22`,
-                }}
-              >
-                <Type size={18} style={{ color: currentTheme.foreground }} />
-                <span className="text-2xl font-mono font-bold" style={{ color: currentTheme.foreground }}>
-                  {completedWords}
-                </span>
-                <span className="text-xs" style={{ color: currentTheme.sub }}>
-                  words
-                </span>
-              </div>
-            </motion.div>
+            <>
+              {showLiveTimer && <span className="text-3xl text-main">{timeLeft}</span>}
+              <span className="text-xl text-sub">{completedWords} words</span>
+            </>
           )}
         </div>
       )}
 
       <div className="min-h-[260px] flex flex-col items-center justify-center text-center">
         {isComplete ? (
-          <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            className="w-full"
-          >
-            <NewBestCelebration show={isRoundNewBest} burstKey={completedAt} theme={currentTheme} />
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.25 }} className="w-full">
+            <NewBestCelebration show={isRoundNewBest} burstKey={completedAt} />
+            <ModBadges mods={mods} />
 
-            <div className={`grid grid-cols-2 ${isSingleRepeatMode ? "md:grid-cols-4" : "md:grid-cols-3"} gap-4 mb-8`}>
-              {isSingleRepeatMode && (
-                <div className="text-center p-6 rounded-2xl" style={{ backgroundColor: `${currentTheme.background}dd` }}>
-                  <Clock3 className="mx-auto mb-2" size={24} style={{ color: currentTheme.primary }} />
-                  <div
-                    className="w-full inline-flex items-baseline justify-center gap-0.5 font-mono font-bold tabular-nums text-4xl md:text-5xl"
-                    style={{ color: currentTheme.primary }}
-                  >
-                    <span>{elapsedSecondsPrecise.toFixed(2)}</span>
-                    <span>s</span>
-                  </div>
-                  <div className="text-sm tracking-wider mt-2 font-medium" style={{ color: currentTheme.primary }}>
-                    time
-                  </div>
-                </div>
-              )}
-
-              <StatTile
-                icon={Type}
-                value={isSingleRepeatMode ? spellingWpm : completedWords}
-                label={isSingleRepeatMode ? "wpm" : "score"}
-                color={isSingleRepeatMode ? currentTheme.caret : currentTheme.primary}
-                labelColor={isSingleRepeatMode ? currentTheme.caret : currentTheme.sub}
-                theme={currentTheme}
-              />
-              <StatTile icon={Target} value={`${accuracy}%`} label="accuracy" color={currentTheme.foreground} theme={currentTheme} />
-              <StatTile
-                icon={AlertCircle}
-                value={incorrectChars}
-                label="incorrect letters"
-                color={currentTheme.incorrect}
-                labelColor={currentTheme.incorrect}
-                theme={currentTheme}
-              />
+            <div className={`grid grid-cols-2 ${isSingleRepeatMode ? "md:grid-cols-4" : "md:grid-cols-3"} gap-6 mb-10`}>
+              {isSingleRepeatMode && <StatTile value={`${elapsedSecondsPrecise.toFixed(2)}s`} label="time" />}
+              <StatTile value={isSingleRepeatMode ? spellingWpm : completedWords} label={isSingleRepeatMode ? "wpm" : "score"} />
+              <StatTile value={`${accuracy}%`} label="acc" accent={false} />
+              <StatTile value={incorrectChars} label="mistakes" accent={false} />
             </div>
 
-            <div className="rounded-2xl p-6 mb-8" style={{ backgroundColor: `${currentTheme.background}dd` }}>
-              <div className={`grid grid-cols-2 ${isSingleRepeatMode ? "md:grid-cols-3" : "md:grid-cols-4"} gap-6 text-center`}>
-                <DetailItem label="mode" theme={currentTheme}>spell ladder</DetailItem>
-                <DetailItem label="characters" theme={currentTheme}>
-                  <CharBreakdown
-                    theme={currentTheme}
-                    parts={[
-                      { label: "correct", value: correctChars, color: currentTheme.correct },
-                      { label: "incorrect", value: incorrectChars, color: currentTheme.incorrect },
-                    ]}
-                  />
-                </DetailItem>
-                <DetailItem label="language" theme={currentTheme}>{language.toLowerCase()}</DetailItem>
-                {!isSingleRepeatMode && <DetailItem label="time" theme={currentTheme}>{elapsedSeconds}s</DetailItem>}
-              </div>
+            <div className={`grid grid-cols-2 ${isSingleRepeatMode ? "md:grid-cols-3" : "md:grid-cols-4"} gap-6 text-center mb-10`}>
+              <DetailItem label="mode">spell ladder</DetailItem>
+              <DetailItem label="characters">
+                <CharBreakdown
+                  parts={[
+                    { label: "correct", value: correctChars },
+                    { label: "incorrect", value: incorrectChars },
+                  ]}
+                />
+              </DetailItem>
+              <DetailItem label="language">{language.replaceAll("_", " ")}</DetailItem>
+              {!isSingleRepeatMode && <DetailItem label="time">{elapsedSeconds}s</DetailItem>}
             </div>
 
-            <ResultActions onRetry={buildRound} onNext={buildRound} theme={currentTheme} />
-            <RestartHint restartKeybind={restartKeybind} theme={currentTheme} />
+            <ResultActions onRetry={buildRound} onNext={buildRound} />
+            <RestartHint restartKeybind={restartKeybind} />
           </motion.div>
         ) : (
-          <>
+          <FunStage correctWords={completedWords} mistakes={incorrectChars} className="flex flex-col items-center">
             <AnimatePresence mode="wait">
               <div ref={wordsRef} className="relative inline-block">
                 {isCaretReady && (
-                  <AnimatedCaret
-                    caretPosition={caretPosition}
-                    smoothCaret={smoothCaret}
-                    fontSize={wordFontSize}
-                    theme={theme}
-                  />
+                  <AnimatedCaret caretPosition={caretPosition} smoothCaret={smoothCaret} fontSize={wordFontSize} caretStyle={caretStyle} />
                 )}
 
                 <motion.div
                   key={`current-${currentIndex}-${currentWord}`}
-                  initial={{ opacity: 0, y: 24, scale: 0.88 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -20, scale: 0.9 }}
-                  transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-                  className="font-mono font-bold tracking-wide leading-none"
-                  style={{ color: currentTheme.foreground, fontSize: `${wordFontSize}px` }}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -12 }}
+                  transition={{ duration: 0.18 }}
+                  className="font-mono leading-none"
+                  style={{ fontSize: `${wordFontSize}px` }}
                 >
                   {typedDisplay}
                 </motion.div>
@@ -589,20 +505,17 @@ export function SpellingClimb() {
             <AnimatePresence mode="wait">
               <motion.div
                 key={`next-${currentIndex}-${nextWord}`}
-                initial={{ opacity: 0, y: 12, scale: 0.9 }}
-                animate={{ opacity: 0.4, y: 0, scale: 0.86 }}
-                exit={{ opacity: 0, y: -8, scale: 0.8 }}
-                transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-                className="mt-5 font-mono text-4xl md:text-5xl font-semibold"
-                style={{
-                  color: currentTheme.sub,
-                  visibility: hasNextWord ? "visible" : "hidden",
-                }}
+                data-next-word={(hasNextWord && !mods.includes("hidden")) || undefined}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.18 }}
+                className={`mt-6 font-mono text-3xl md:text-4xl text-sub/60 ${hasNextWord && !mods.includes("hidden") ? "" : "invisible"}`}
               >
-                {hasNextWord ? nextWord : "\u00A0"}
+                {hasNextWord ? nextWord : " "}
               </motion.div>
             </AnimatePresence>
-          </>
+          </FunStage>
         )}
       </div>
     </div>

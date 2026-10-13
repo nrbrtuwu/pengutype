@@ -8,8 +8,8 @@ import { Results } from "./results";
 import { ModeSelector } from "./mode-selector";
 import { SpellingClimb } from "./spelling-climb";
 import { SpellLadderSelector } from "./spell-ladder-selector";
+import { isModalOpen } from "./picker-modal";
 import { Toaster, toast } from "sonner";
-import { themes } from "@/lib/themes";
 
 export function TypingTest() {
   const {
@@ -20,17 +20,13 @@ export function TypingTest() {
     restartKeybind,
     isTestActive,
     isTestComplete,
-    showSettings,
-    showStatsPanel,
     showCommandPalette,
     suppressResultRecording,
-    theme,
     resetTest,
     exitRetryMode,
     invalidationNotice,
     clearInvalidationNotice,
   } = useTypingStore();
-  const currentTheme = themes[theme];
 
 
   const resetFromKeybind = useCallback(() => {
@@ -58,6 +54,8 @@ export function TypingTest() {
     let isTabDown = false;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (isModalOpen()) return;
+
       if (e.key === "Tab") {
         e.preventDefault();
 
@@ -71,9 +69,8 @@ export function TypingTest() {
         isTabDown = true;
       }
 
-      const hasOverlayOpen = showSettings || showStatsPanel || showCommandPalette;
 
-      if (e.key === "Escape" && isTestActive && !isTestComplete && !hasOverlayOpen) {
+      if (e.key === "Escape" && isTestActive && !isTestComplete && !showCommandPalette) {
         e.preventDefault();
         if (suppressResultRecording) {
           exitRetryMode();
@@ -115,8 +112,6 @@ export function TypingTest() {
     exitRetryMode,
     resetTest,
     restartKeybind,
-    showSettings,
-    showStatsPanel,
     showCommandPalette,
     gameMode,
   ]);
@@ -142,15 +137,11 @@ export function TypingTest() {
   }, [isTestComplete]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 relative z-10">
+    <div className="min-h-screen flex items-center justify-center px-24 relative z-10">
       <Toaster
         position="bottom-right"
         offset={{ bottom: 88 }}
-        richColors
-        theme="dark"
-        toastOptions={{
-          className: "pengu-toast",
-        }}
+        toastOptions={{ className: "pengu-toast" }}
       />
 
       {gameMode === "normal" ? <ModeSelector /> : <SpellLadderSelector />}
@@ -159,21 +150,9 @@ export function TypingTest() {
       <div className="w-full max-w-4xl mx-auto">
         {gameMode === "normal" && suppressResultRecording && !isTestComplete && (
           <div className="mb-4 text-center">
-            <p
-              className="text-sm sm:text-base font-bold tracking-wide italic"
-              style={{
-                color: currentTheme.foreground,
-              }}
-            >
-              retry mode active
-            </p>
+            <p className="text-sm sm:text-base font-medium text-main">retry mode</p>
             {!isTestActive && (
-              <p
-                className="text-xs sm:text-sm mt-1 italic"
-                style={{
-                  color: currentTheme.sub,
-                }}
-              >
+              <p className="text-xs sm:text-sm mt-1 text-sub">
                 new bests on this retried test will not count toward history or records.
               </p>
             )}

@@ -1,50 +1,36 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { themes, ThemeKey } from "@/lib/themes";
+import type { CaretStyle } from "@/lib/store";
 
 interface AnimatedCaretProps {
   caretPosition: { x: number; y: number };
   smoothCaret: boolean;
   fontSize: number;
-  theme: ThemeKey;
+  caretStyle: CaretStyle;
 }
 
-export function AnimatedCaret({
-  caretPosition,
-  smoothCaret,
-  fontSize,
-  theme,
-}: AnimatedCaretProps) {
-  const currentTheme = themes[theme];
-  const caretWidth = 2;
-  const caretHeight = Math.max(10, Math.round(fontSize * 1.2));
+// monospace letters are ~0.6em wide
+const LETTER_WIDTH_EM = 0.6;
+
+export function AnimatedCaret({ caretPosition, smoothCaret, fontSize, caretStyle }: AnimatedCaretProps) {
+  const height = Math.max(10, Math.round(fontSize * 1.2));
+  const letterWidth = Math.round(fontSize * LETTER_WIDTH_EM);
+
+  const shape = {
+    line: { width: 2, height, top: 0, opacity: 1 },
+    block: { width: letterWidth, height, top: 0, opacity: 0.4 },
+    underline: { width: letterWidth, height: 3, top: height - 3, opacity: 1 },
+  }[caretStyle];
 
   return (
     <motion.div
-      className="absolute z-20 pointer-events-none"
+      data-caret
+      className="absolute left-0 z-20 rounded-sm bg-caret pointer-events-none"
       initial={false}
       animate={{ x: caretPosition.x, y: caretPosition.y }}
-      transition={
-        smoothCaret
-          ? { type: "spring", stiffness: 520, damping: 38, mass: 0.25 }
-          : { duration: 0 }
-      }
-      style={{
-        width: caretWidth,
-        height: caretHeight,
-        backgroundColor: currentTheme.caret,
-        borderRadius: 1,
-        boxShadow: `0 0 10px ${currentTheme.caret}`,
-        left: 0,
-        top: 0,
-        willChange: "transform",
-      }}
-    >
-      <span
-        className="absolute inset-0 rounded-sm animate-pulse"
-        style={{ backgroundColor: currentTheme.caret }}
-      />
-    </motion.div>
+      transition={smoothCaret ? { type: "spring", stiffness: 520, damping: 38, mass: 0.25 } : { duration: 0 }}
+      style={shape}
+    />
   );
 }

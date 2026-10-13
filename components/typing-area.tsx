@@ -2,127 +2,70 @@
 
 import { useEffect, useRef, memo } from "react";
 import { useTypingStore } from "@/lib/store";
-import { themes } from "@/lib/themes";
 import { useCaretPosition } from "@/hooks/use-caret-position";
 import { AnimatedCaret } from "./animated-caret";
+import { FunStage } from "./fun-stage";
+import { isModalOpen } from "./picker-modal";
+import { countCorrectWords } from "@/lib/typing-metrics";
 
-// Memoized character component to prevent unnecessary re-renders
-const Character = memo(function Character({ 
-  char, 
-  color,
-  isMissed,
-  missedUnderlineColor,
-}: { 
-  char: string; 
-  color: string;
-  isMissed?: boolean;
-  missedUnderlineColor?: string;
-}) {
-  return (
-    <span 
-      data-char
-      style={{
-        color,
-        textDecorationLine: isMissed ? "underline" : "none",
-        textDecorationColor: isMissed ? (missedUnderlineColor ?? color) : undefined,
-        textUnderlineOffset: isMissed ? "0.22em" : undefined,
-        textDecorationThickness: isMissed ? "2px" : undefined,
-      }}
-      className="transition-colors duration-75"
-    >
-      {char}
-    </span>
-  );
+export const CaretAnchor = memo(function CaretAnchor() {
+  return <span data-caret-anchor aria-hidden className="inline-block align-baseline w-0 h-[1em] pointer-events-none" />;
 });
 
-const CaretAnchor = memo(function CaretAnchor() {
-  return (
-    <span
-      data-caret-anchor
-      aria-hidden
-      className="inline-block align-baseline"
-      style={{
-        width: 0,
-        height: "1em",
-        margin: 0,
-        padding: 0,
-        pointerEvents: "none",
-      }}
-    />
-  );
-});
-
-// Memoized word component
 const Word = memo(function Word({
   word,
   wordIndex,
   typedChars,
   currentWordIndex,
-  theme,
+  blindMode,
+  hidden,
 }: {
   word: string;
   wordIndex: number;
   typedChars: { char: string; correct: boolean; extra?: boolean }[];
   currentWordIndex: number;
-  theme: string;
+  /** show typed letters as plain text, hiding mistakes */
+  blindMode: boolean;
+  /** hidden mod: word is invisible but keeps its space */
+  hidden: boolean;
 }) {
-  const currentTheme = themes[theme];
   const isCurrentWord = wordIndex === currentWordIndex;
   const isWordComplete = wordIndex < currentWordIndex;
   const caretIndex = typedChars.length;
-  const baseChars = word.split("");
-  const hasMissingChars = isWordComplete && typedChars.length < baseChars.length;
-  const extraChars = typedChars.filter((c) => c.extra);
-  const coreContent = baseChars.map((char, charIndex) => {
+  // Finished words with missing letters get an error underline
+  const hasMissingChars = !blindMode && isWordComplete && typedChars.length < word.length;
+
+  const letters = word.split("").map((char, charIndex) => {
     const typedChar = typedChars[charIndex];
-    let color = currentTheme.sub;
-    const shouldUnderlineWord = hasMissingChars;
-
-    if (typedChar) {
-      color = typedChar.correct ? currentTheme.correct : currentTheme.incorrect;
-    } else if (isWordComplete) {
-      color = currentTheme.missing;
-    }
-
+    const color = !typedChar ? "text-sub" : typedChar.correct || blindMode ? "text-text" : "text-error";
     return (
-      <Character
-        key={`char-${charIndex}`}
-        char={char}
-        color={color}
-        isMissed={shouldUnderlineWord}
-        missedUnderlineColor={currentTheme.incorrect}
-      />
+      <span key={charIndex} data-char className={color}>
+        {char}
+      </span>
     );
   });
 
-  if (isCurrentWord && caretIndex <= baseChars.length) {
-    coreContent.splice(
-      caretIndex,
-      0,
-      <CaretAnchor key="caret-anchor" />,
-    );
+  // blind mode hides extra letters, so the caret waits at the end of the word
+  if (isCurrentWord && (caretIndex <= word.length || blindMode)) {
+    letters.splice(Math.min(caretIndex, word.length), 0, <CaretAnchor key="caret-anchor" />);
   }
 
   return (
     <span
       data-word
-      className="inline-block"
+      // the flashlight mod lights this word so you can read ahead, even across a line break
+      data-next-word={wordIndex === currentWordIndex + 1 || undefined}
+      className={`inline-block ${hidden ? "invisible" : ""} ${hasMissingChars ? "underline decoration-error decoration-2 underline-offset-[0.22em]" : ""}`}
     >
-      {coreContent}
-      
-      {/* Extra characters */}
-      {extraChars.map((typedChar, extraIndex) => (
-        <span
-          key={`extra-${extraIndex}`}
-          style={{ color: currentTheme.extra }}
-        >
+      {letters}
+
+      {!blindMode && typedChars.filter((c) => c.extra).map((typedChar, extraIndex) => (
+        <span key={`extra-${extraIndex}`} className="text-error-extra">
           {typedChar.char}
         </span>
       ))}
 
-      {isCurrentWord && caretIndex > baseChars.length && (
-        <CaretAnchor key="caret-anchor-after-extra" />
-      )}
+      {isCurrentWord && caretIndex > word.length && !blindMode && <CaretAnchor key="caret-anchor-after-extra" />}
     </span>
   );
 });
@@ -134,13 +77,14 @@ export function TypingArea() {
     currentWordIndex,
     isTestActive,
     isTestComplete,
-    suppressResultRecording,
     handleKeyPress,
-    theme,
     smoothCaret,
     fontSize,
+    caretStyle,
+    visibleLines,
+    blindMode,
+    mods,
   } = useTypingStore();
-  const currentTheme = themes[theme];
 
   const containerRef = useRef<HTMLDivElement>(null);
   const wordsRef = useRef<HTMLDivElement>(null);
@@ -171,7 +115,7 @@ export function TypingArea() {
   // Handle keyboard input
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (isTestComplete) return;
+      if (isTestComplete || isModalOpen()) return;
 
       const isReloadShortcut = e.key === "F5" || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "r");
       if (isReloadShortcut) {
@@ -221,69 +165,67 @@ export function TypingArea() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isTestActive, isTestComplete, typedChars]);
 
-  // Scroll words into view
+  // Scroll by whole lines so the current line stays put (second line, or first when only 2 are visible)
   useEffect(() => {
-    if (!wordsRef.current) return;
-    
-    const wordElements = wordsRef.current.querySelectorAll("[data-word]");
-    const currentWordEl = wordElements[currentWordIndex] as HTMLElement;
-    
-    if (currentWordEl) {
-      const containerRect = wordsRef.current.getBoundingClientRect();
-      const wordRect = currentWordEl.getBoundingClientRect();
-      
-      if (wordRect.top > containerRect.top + containerRect.height * 0.6) {
-        wordsRef.current.scrollTo({
-          top: wordsRef.current.scrollTop + wordRect.height * 2,
-          behavior: "smooth"
-        });
-      }
-    }
-  }, [currentWordIndex]);
+    const container = wordsRef.current;
+    const currentWordEl = container?.querySelectorAll<HTMLElement>("[data-word]")[currentWordIndex];
+    if (!container || !currentWordEl) return;
+
+    const lineHeight = effectiveFontSize * 1.6;
+    const lineIndex = Math.round(currentWordEl.offsetTop / lineHeight);
+    const linesAbove = visibleLines >= 3 ? 1 : 0;
+    container.scrollTo({ top: Math.max(0, lineIndex - linesAbove) * lineHeight, behavior: "smooth" });
+  }, [currentWordIndex, effectiveFontSize, visibleLines]);
 
   if (isTestComplete) {
     return null;
   }
 
-  return (
-    <div
-      ref={containerRef}
-      tabIndex={0}
-      className="relative outline-none w-full"
-      style={{ fontSize: `${effectiveFontSize}px` }}
-    >
-      {/* Words container */}
-      <div
-        ref={wordsRef}
-        className="relative overflow-hidden leading-relaxed font-mono select-none p-4"
-        style={{ 
-          height: `${effectiveFontSize * 5}px`,
-          lineHeight: `${effectiveFontSize * 1.6}px`,
-        }}
-      >
-        {isCaretReady && (
-          <AnimatedCaret
-            caretPosition={caretPosition}
-            smoothCaret={smoothCaret}
-            fontSize={effectiveFontSize}
-            theme={theme}
-          />
-        )}
+  const mistakes = typedChars.reduce((sum, word) => sum + word.filter((c) => !c.correct || c.extra).length, 0);
 
-        {/* Words */}
-        <div className="flex flex-wrap gap-x-3">
-          {words.map((word, wordIndex) => (
-            <Word
-              key={wordIndex}
-              word={word}
-              wordIndex={wordIndex}
-              typedChars={typedChars[wordIndex] || []}
-              currentWordIndex={currentWordIndex}
-              theme={theme}
+  return (
+    <FunStage correctWords={countCorrectWords(words, typedChars, currentWordIndex)} mistakes={mistakes} className="w-full">
+      <div
+        ref={containerRef}
+        tabIndex={0}
+        className="relative outline-none w-full"
+        style={{ fontSize: `${effectiveFontSize}px` }}
+      >
+        {/* Words container */}
+        <div
+          ref={wordsRef}
+          className="relative overflow-hidden leading-relaxed font-mono select-none px-4"
+          style={{ 
+            // exactly `visibleLines` lines, so neighboring lines never peek in
+            height: `${visibleLines * effectiveFontSize * 1.6}px`,
+            lineHeight: `${effectiveFontSize * 1.6}px`,
+          }}
+        >
+          {isCaretReady && (
+            <AnimatedCaret
+              caretPosition={caretPosition}
+              smoothCaret={smoothCaret}
+              fontSize={effectiveFontSize}
+              caretStyle={caretStyle}
             />
-          ))}
+          )}
+
+          {/* Words */}
+          <div className="flex flex-wrap gap-x-3">
+            {words.map((word, wordIndex) => (
+              <Word
+                key={wordIndex}
+                word={word}
+                wordIndex={wordIndex}
+                typedChars={typedChars[wordIndex] || []}
+                currentWordIndex={currentWordIndex}
+                blindMode={blindMode}
+                hidden={mods.includes("hidden") && wordIndex > currentWordIndex + 1}
+              />
+            ))}
+          </div>
         </div>
       </div>
-    </div>
+    </FunStage>
   );
 }

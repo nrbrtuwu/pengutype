@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import type { Theme } from "@/lib/themes";
 
 type PickerOption = { key: string; label: string };
 
@@ -13,14 +12,12 @@ export function PickerModal({
   emptyText,
   onSelect,
   onClose,
-  theme,
 }: {
   options: PickerOption[];
   placeholder: string;
   emptyText: string;
   onSelect: (key: string) => void;
   onClose: () => void;
-  theme: Theme;
 }) {
   const [query, setQuery] = useState("");
   const [highlighted, setHighlighted] = useState(0);
@@ -63,60 +60,59 @@ export function PickerModal({
   }, [highlighted]);
 
   return (
-    <>
-      <div className="fixed inset-0 z-40" style={{ backgroundColor: `${theme.background}cc` }} onClick={onClose} />
-
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: -12 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ type: "spring", stiffness: 380, damping: 30 }}
-        className="fixed top-[18%] left-1/2 -translate-x-1/2 z-50 w-full max-w-lg rounded-2xl overflow-hidden"
-        style={{
-          backgroundColor: theme.background,
-          border: `1px solid ${theme.secondary}`,
-          boxShadow: `0 20px 60px ${theme.background}cc`,
+    <Modal onClose={onClose}>
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setHighlighted(0);
         }}
-      >
-        <div className="px-4 py-3 border-b" style={{ borderColor: theme.secondary }}>
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setHighlighted(0);
-            }}
-            placeholder={placeholder}
-            autoFocus
-            className="w-full bg-transparent outline-none"
-            style={{ color: theme.foreground }}
-          />
-        </div>
+        placeholder={placeholder}
+        autoFocus
+        className="w-full px-4 py-3 bg-transparent outline-none text-text placeholder:text-sub"
+      />
 
-        <div className="max-h-80 overflow-y-auto py-2">
-          {filtered.length > 0 ? (
-            filtered.map((option, index) => (
-              <button
-                key={option.key}
-                ref={(element) => {
-                  optionRefs.current[index] = element;
-                }}
-                className="w-full text-left px-4 py-2 transition-colors"
-                style={{
-                  color: theme.foreground,
-                  backgroundColor: index === highlighted ? theme.secondary : "transparent",
-                }}
-                onMouseEnter={() => setHighlighted(index)}
-                onClick={() => select(option)}
-              >
-                {option.label}
-              </button>
-            ))
-          ) : (
-            <div className="px-4 py-6 text-sm" style={{ color: theme.sub }}>
-              {emptyText}
-            </div>
-          )}
-        </div>
+      <div className="max-h-80 overflow-y-auto pb-2">
+        {filtered.length > 0 ? (
+          filtered.map((option, index) => (
+            <button
+              key={option.key}
+              ref={(element) => {
+                optionRefs.current[index] = element;
+              }}
+              className={`w-full text-left px-4 py-2 ${index === highlighted ? "bg-sub-alt text-text" : "text-sub"}`}
+              onMouseEnter={() => setHighlighted(index)}
+              onClick={() => select(option)}
+            >
+              {option.label}
+            </button>
+          ))
+        ) : (
+          <div className="px-4 py-6 text-sm text-sub">{emptyText}</div>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+/** True while any Modal is open, so typing shouldn't reach the test underneath. */
+export function isModalOpen(): boolean {
+  return document.querySelector("[data-modal]") !== null;
+}
+
+/** Centered popup over a dimmed backdrop. */
+export function Modal({ onClose, children, className = "top-[18%] max-w-lg" }: { onClose: () => void; children: React.ReactNode; className?: string }) {
+  return (
+    <>
+      <div data-modal className="fixed inset-0 z-40 bg-black/50" onClick={onClose} />
+      <motion.div
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.15 }}
+        className={`fixed left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] rounded-lg overflow-hidden bg-bg ${className}`}
+      >
+        {children}
       </motion.div>
     </>
   );

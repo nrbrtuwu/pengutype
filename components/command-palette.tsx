@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { useTypingStore, TIME_OPTIONS, WORD_OPTIONS } from "@/lib/store";
 import { themes, ThemeKey } from "@/lib/themes";
+import { Modal } from "./picker-modal";
 import { languages, LanguageKey, getLanguageDisplayName } from "@/lib/words";
-import { motion, AnimatePresence } from "framer-motion";
 import { Search, Palette, Globe, Clock, Hash, RotateCcw, Settings, BarChart3 } from "lucide-react";
 
 interface Command {
@@ -20,19 +21,16 @@ export function CommandPalette() {
   const {
     showCommandPalette,
     toggleCommandPalette,
-    theme,
     setTheme,
     setLanguage,
     setMode,
     setTimeOption,
     setWordOption,
     resetTest,
-    toggleSettings,
-    toggleStatsPanel,
     restartKeybind
   } = useTypingStore();
+  const router = useRouter();
 
-  const currentTheme = themes[theme];
   const [search, setSearch] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
 
@@ -45,7 +43,7 @@ export function CommandPalette() {
       cmds.push({
         id: `theme-${key}`,
         icon: <Palette size={16} />,
-        label: t.name,
+        label: t.name.toLowerCase(),
         category: "theme",
         action: () => {
           setTheme(key as ThemeKey);
@@ -128,6 +126,7 @@ export function CommandPalette() {
       category: "action",
       action: () => {
         resetTest();
+        router.push("/");
         toggleCommandPalette();
       },
       shortcut: restartKeybind === "tab" ? "tab" : "tab + enter"
@@ -138,7 +137,7 @@ export function CommandPalette() {
       label: "open settings",
       category: "action",
       action: () => {
-        toggleSettings();
+        router.push("/settings");
         toggleCommandPalette();
       },
       shortcut: "ctrl + p"
@@ -149,13 +148,13 @@ export function CommandPalette() {
       label: "open statistics",
       category: "action",
       action: () => {
-        toggleStatsPanel();
+        router.push("/stats");
         toggleCommandPalette();
       }
     });
 
     return cmds;
-  }, [setTheme, setLanguage, setMode, setTimeOption, setWordOption, resetTest, toggleSettings, toggleCommandPalette, toggleStatsPanel, restartKeybind]);
+  }, [setTheme, setLanguage, setMode, setTimeOption, setWordOption, resetTest, toggleCommandPalette, router, restartKeybind]);
 
   // Filter commands
   const filteredCommands = useMemo(() => {
@@ -217,15 +216,11 @@ export function CommandPalette() {
         e.preventDefault();
         toggleCommandPalette();
       }
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "p") {
-        e.preventDefault();
-        toggleSettings();
-      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [toggleCommandPalette, toggleSettings]);
+  }, [toggleCommandPalette]);
 
   // Group commands by category
   const groupedCommands = useMemo(() => {
@@ -237,107 +232,48 @@ export function CommandPalette() {
     return groups;
   }, [filteredCommands]);
 
+  if (!showCommandPalette) return null;
+
   return (
-    <AnimatePresence>
-      {showCommandPalette && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50"
-            style={{ backgroundColor: `${currentTheme.background}cc` }}
-            onClick={toggleCommandPalette}
-          />
+    <Modal onClose={toggleCommandPalette} className="top-[20%] max-w-lg">
+      <div className="flex items-center gap-3 px-4 py-3 text-sub">
+        <Search size={18} />
+        <input
+          type="text"
+          placeholder="search commands..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="flex-1 bg-transparent outline-none text-text placeholder:text-sub"
+          autoFocus
+        />
+      </div>
 
-          {/* Palette */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: -20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: -20 }}
-            transition={{ type: "spring", damping: 25, stiffness: 400 }}
-            className="fixed top-[20%] left-1/2 -translate-x-1/2 w-full max-w-lg z-50 rounded-xl overflow-hidden shadow-2xl"
-            style={{ backgroundColor: currentTheme.background, borderWidth: 1, borderColor: currentTheme.secondary }}
-          >
-            {/* Search input */}
-            <div 
-              className="flex items-center gap-3 px-4 py-3 border-b"
-              style={{ borderColor: currentTheme.secondary }}
-            >
-              <Search size={18} style={{ color: currentTheme.sub }} />
-              <input
-                type="text"
-                placeholder="search commands..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="flex-1 bg-transparent outline-none text-base"
-                style={{ color: currentTheme.foreground }}
-                autoFocus
-              />
-              <kbd 
-                className="px-2 py-1 rounded text-xs font-mono"
-                style={{ backgroundColor: currentTheme.secondary, color: currentTheme.sub }}
-              >
-                esc
-              </kbd>
-            </div>
+      <div className="max-h-80 overflow-y-auto pb-2">
+        {Object.entries(groupedCommands).map(([category, cmds]) => (
+          <div key={category}>
+            <div className="px-4 pt-2 pb-1 text-xs text-sub">{category}</div>
+            {cmds.map((cmd) => {
+              const index = filteredCommands.indexOf(cmd);
+              const isSelected = index === selectedIndex;
 
-            {/* Commands list */}
-            <div className="max-h-80 overflow-y-auto py-2">
-              {Object.entries(groupedCommands).map(([category, cmds]) => (
-                <div key={category}>
-                  <div 
-                    className="px-4 py-2 text-xs tracking-wider"
-                    style={{ color: currentTheme.sub }}
-                  >
-                    {category}
-                  </div>
-                  {cmds.map((cmd) => {
-                    const globalIndex = filteredCommands.indexOf(cmd);
-                    const isSelected = globalIndex === selectedIndex;
-
-                    return (
-                      <motion.button
-                        key={cmd.id}
-                        onClick={cmd.action}
-                        className="w-full flex items-center gap-3 px-4 py-2 text-left transition-colors"
-                        style={{
-                          backgroundColor: isSelected ? currentTheme.secondary : "transparent",
-                          color: isSelected ? currentTheme.primary : currentTheme.foreground
-                        }}
-                        whileHover={{ backgroundColor: currentTheme.secondary }}
-                      >
-                        <span style={{ color: isSelected ? currentTheme.primary : currentTheme.sub }}>
-                          {cmd.icon}
-                        </span>
-                        <span className="flex-1">{cmd.label}</span>
-                        {cmd.shortcut && (
-                          <kbd 
-                            className="px-2 py-1 rounded text-xs font-mono"
-                            style={{ backgroundColor: currentTheme.background, color: currentTheme.sub }}
-                          >
-                            {cmd.shortcut}
-                          </kbd>
-                        )}
-                      </motion.button>
-                    );
-                  })}
-                </div>
-              ))}
-
-              {filteredCommands.length === 0 && (
-                <div 
-                  className="px-4 py-8 text-center"
-                  style={{ color: currentTheme.sub }}
+              return (
+                <button
+                  key={cmd.id}
+                  onClick={cmd.action}
+                  onMouseEnter={() => setSelectedIndex(index)}
+                  className={`w-full flex items-center gap-3 px-4 py-2 text-left ${isSelected ? "bg-sub-alt text-text" : "text-sub"}`}
                 >
-                  No commands found
-                </div>
-              )}
-            </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+                  {cmd.icon}
+                  <span className="flex-1">{cmd.label}</span>
+                  {cmd.shortcut && <span className="text-xs font-mono text-sub">{cmd.shortcut}</span>}
+                </button>
+              );
+            })}
+          </div>
+        ))}
+
+        {filteredCommands.length === 0 && <div className="px-4 py-8 text-center text-sub">no commands found</div>}
+      </div>
+    </Modal>
   );
 }
