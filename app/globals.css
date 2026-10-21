@@ -2,8 +2,9 @@
 
 /* Theme colors are CSS variables set on <html> (see lib/theme-dom.ts) */
 @theme inline {
-  --font-sans: var(--font-inter), 'Inter', system-ui, sans-serif;
-  --font-mono: var(--font-jetbrains), 'JetBrains Mono', 'Fira Code', monospace;
+  /* one font everywhere; --font-app is the font picked in settings (see lib/theme-dom.ts) */
+  --font-sans: var(--font-app, var(--font-jetbrains)), 'JetBrains Mono', monospace;
+  --font-mono: var(--font-app, var(--font-jetbrains)), 'JetBrains Mono', monospace;
   --color-bg: var(--bg);
   --color-main: var(--main);
   --color-caret: var(--caret);
@@ -67,4 +68,12 @@
   .fun-drunk {
     animation-duration: 12s;
   }
+}
+
+/* Reduce motion setting (see AppShell): no CSS transitions or smooth scrolling. Fun modes keep their effects. */
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  transition-duration: 0s !important;
+  scroll-behavior: auto !important;
 }

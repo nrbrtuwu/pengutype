@@ -7,6 +7,8 @@ import { getSpellingChain } from "@/lib/words";
 import { useCaretPosition } from "@/hooks/use-caret-position";
 import { AnimatedCaret } from "./animated-caret";
 import { FunStage } from "./fun-stage";
+import { Keymap } from "./keymap";
+import { playTypingSound } from "@/lib/sounds";
 import { isModalOpen } from "./picker-modal";
 import { CaretAnchor } from "./typing-area";
 import { CharBreakdown, DetailItem, ModBadges, NewBestCelebration, RestartHint, ResultActions, StatTile } from "./result-parts";
@@ -20,6 +22,7 @@ export function SpellingClimb() {
     caretStyle,
     blindMode,
     showLiveTimer,
+    showKeymap,
     timeOption,
     spellingRepeatMode,
     setInvalidationNotice,
@@ -301,6 +304,7 @@ export function SpellingClimb() {
 
       if (key === "Backspace") {
         event.preventDefault();
+        playTypingSound(false);
         setTyped((prev) => prev.slice(0, -1));
         return;
       }
@@ -337,6 +341,7 @@ export function SpellingClimb() {
       const nextTyped = `${typed}${key}`;
 
       const isCorrectPress = key.toLowerCase() === nextExpected.toLowerCase();
+      playTypingSound(!isCorrectPress);
       if (isCorrectPress) {
         setCorrectChars((prev) => prev + 1);
       } else {
@@ -481,6 +486,7 @@ export function SpellingClimb() {
             <RestartHint restartKeybind={restartKeybind} />
           </motion.div>
         ) : (
+          <>
           <FunStage correctWords={completedWords} mistakes={incorrectChars} className="flex flex-col items-center">
             <AnimatePresence mode="wait">
               <div ref={wordsRef} className="relative inline-block">
@@ -516,6 +522,8 @@ export function SpellingClimb() {
               </motion.div>
             </AnimatePresence>
           </FunStage>
+          {showKeymap && <Keymap nextKey={currentWord[typed.length] ?? null} />}
+          </>
         )}
       </div>
     </div>

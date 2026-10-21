@@ -5,7 +5,7 @@ import { RefObject, useCallback, useEffect, useLayoutEffect, useState } from "re
  * Unlike getBoundingClientRect this ignores CSS transforms, so the caret stays correct when the words are
  * mirrored or swaying (fun modes) and while words animate in.
  */
-function layoutOffsetWithin(element: HTMLElement, container: HTMLElement) {
+export function layoutOffsetWithin(element: HTMLElement, container: HTMLElement) {
   let x = 0;
   let y = 0;
   let node: HTMLElement | null = element;

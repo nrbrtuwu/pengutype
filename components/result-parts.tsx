@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotionConfig } from "framer-motion";
 import { RotateCcw, ChevronRight } from "lucide-react";
 import { useTypingStore, type RestartKeybind } from "@/lib/store";
 import { formatMods, type ModKey } from "@/lib/mods";
@@ -14,7 +14,8 @@ const CONFETTI_COLORS = ["var(--main)", "var(--text)", "var(--sub)"];
 /** Confetti burst plus a "new best!" label. `burstKey` changes per result so each new best re-fires. */
 export function NewBestCelebration({ show, burstKey }: { show: boolean; burstKey: unknown }) {
   const [showConfetti, setShowConfetti] = useState(false);
-  const confettiEnabled = useTypingStore((state) => state.showConfetti);
+  const reduceMotion = useReducedMotionConfig();
+  const confettiEnabled = useTypingStore((state) => state.showConfetti) && !reduceMotion;
 
   const pieces = useMemo(
     () =>

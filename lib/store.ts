@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { getRandomWords } from '@/lib/words';
+import { FONTS, DEFAULT_FONT, type FontKey } from '@/lib/fonts';
 import { languages } from '@/languages';
 import type { LanguageKey } from '@/languages';
 import { MODS, type ModKey } from './mods';
@@ -14,6 +15,13 @@ export type TimeOption = 15 | 30 | 60 | 120;
 export type WordOption = 10 | 25 | 50 | 100;
 export type RestartKeybind = 'tab-enter' | 'tab';
 export type CaretStyle = 'line' | 'block' | 'underline';
+export type PaceCaret = 'off' | 'pb' | 'average' | 'custom';
+export type StopOnError = 'off' | 'letter' | 'word';
+export type ConfidenceMode = 'off' | 'on' | 'max';
+export type IndicateTypos = 'off' | 'below' | 'replace';
+export type KeySound = 'off' | 'click' | 'pop' | 'typewriter';
+export type ReduceMotion = 'auto' | 'on' | 'off';
+export type RandomTheme = 'off' | 'test' | 'day';
 
 /** Quality-of-life preferences, changed through updateSettings(). */
 export interface QolSettings {
@@ -30,6 +38,37 @@ export interface QolSettings {
   showLiveWpm: boolean;
   showLiveAccuracy: boolean;
   showConfetti: boolean;
+
+  /** ghost caret moving at a target speed */
+  paceCaret: PaceCaret;
+  paceCaretWpm: number;
+  /** letter: wrong keys aren't typed (still count as mistakes); word: space only advances from a correct word */
+  stopOnError: StopOnError;
+  /** on: can't go back to previous words; max: backspace disabled */
+  confidenceMode: ConfidenceMode;
+  /** space only advances once every letter of the word is typed */
+  strictSpace: boolean;
+  /** show the letter that was actually typed for mistakes */
+  indicateTypos: IndicateTypos;
+  /** fail the test when live wpm/accuracy drop below these (0 = off) */
+  minWpm: number;
+  minAccuracy: number;
+  keySound: KeySound;
+  errorSound: boolean;
+  /** 0..1 */
+  soundVolume: number;
+
+  /** switch between lightTheme and darkTheme with the OS color scheme */
+  followSystemTheme: boolean;
+  lightTheme: ThemeKey;
+  darkTheme: ThemeKey;
+  randomTheme: RandomTheme;
+  reduceMotion: ReduceMotion;
+  /** one line of words that scrolls sideways */
+  tapeMode: boolean;
+  showProgressBar: boolean;
+  showKeymap: boolean;
+  font: FontKey;
 }
 
 const DEFAULT_QOL_SETTINGS: QolSettings = {
@@ -42,6 +81,28 @@ const DEFAULT_QOL_SETTINGS: QolSettings = {
   showLiveWpm: true,
   showLiveAccuracy: true,
   showConfetti: true,
+
+  paceCaret: 'off',
+  paceCaretWpm: 100,
+  stopOnError: 'off',
+  confidenceMode: 'off',
+  strictSpace: false,
+  indicateTypos: 'off',
+  minWpm: 0,
+  minAccuracy: 0,
+  keySound: 'off',
+  errorSound: false,
+  soundVolume: 0.5,
+
+  followSystemTheme: false,
+  lightTheme: 'penguin_light',
+  darkTheme: 'penguin',
+  randomTheme: 'off',
+  reduceMotion: 'auto',
+  tapeMode: false,
+  showProgressBar: false,
+  showKeymap: false,
+  font: 'jetbrains_mono',
 };
 
 export const TIME_OPTIONS: TimeOption[] = [15, 30, 60, 120];
@@ -102,6 +163,8 @@ interface TypingState extends QolSettings {
   timeLeft: number;
   /** Retry mode: replays the same words and doesn't record the result. */
   suppressResultRecording: boolean;
+  /** wrong keys rejected by stop-on-error (letter); counted as mistakes */
+  rejectedKeys: number;
   currentResult: TestResult | null;
   invalidationNotice: { id: number; reason: string } | null;
   spellLadderStarted: boolean;
@@ -177,6 +240,7 @@ function freshTest(words: string[], timeOption: TimeOption, suppressResultRecord
     startTime: null,
     timeLeft: timeOption,
     suppressResultRecording,
+    rejectedKeys: 0,
     currentResult: null,
     invalidationNotice: null,
   };
@@ -243,6 +307,7 @@ export const useTypingStore = create<TypingState>()(
             : Math.max(0.001, elapsedSeconds);
 
           const characterStats = calculateCharacterStats(state.words, state.typedChars, state.currentWordIndex);
+          characterStats.incorrectChars += state.rejectedKeys;
           const separatorStats = calculateSeparatorStats(state.words, state.typedChars, state.currentWordIndex);
           const performanceStats = calculatePerformanceStats(characterStats, testDurationSeconds, 0, {
             additionalCorrectChars: separatorStats.correctSeparators,
@@ -318,16 +383,27 @@ export const useTypingStore = create<TypingState>()(
           newTypedChars[state.currentWordIndex] = currentWordChars;
 
           if (key === 'Backspace') {
+            if (state.confidenceMode === 'max') return;
+
+            const previousWordIndex = state.currentWordIndex - 1;
+            const canGoBack =
+              previousWordIndex >= 0 &&
+              state.confidenceMode === 'off' &&
+              // without freedom mode, only back into a mistyped word
+              (state.freedomMode || !isWordCorrect(state.words[previousWordIndex], newTypedChars[previousWordIndex]));
+
             if (currentWordChars.length > 0) {
               currentWordChars.pop();
               set({ typedChars: newTypedChars });
-            } else if (state.currentWordIndex > 0 && (state.freedomMode || !isWordCorrect(state.words[state.currentWordIndex - 1], newTypedChars[state.currentWordIndex - 1]))) {
-              // Go back to previous word (without freedom mode, only to fix a mistyped one)
-              set({ currentWordIndex: state.currentWordIndex - 1, typedChars: newTypedChars });
+            } else if (canGoBack) {
+              set({ currentWordIndex: previousWordIndex, typedChars: newTypedChars });
             }
           } else if (key === ' ') {
             // Move to next word if current word has characters
             if (currentWordChars.length > 0) {
+              if (state.strictSpace && currentWordChars.length < currentWord.length) return;
+              if (state.stopOnError === 'word' && !isWordCorrect(currentWord, currentWordChars)) return;
+
               if (state.mods.includes('sudden-death') && currentWordChars.length < currentWord.length) {
                 get().endTest('sudden death: skipped letters');
                 return;
@@ -348,6 +424,17 @@ export const useTypingStore = create<TypingState>()(
           } else if (key.length === 1) {
             const charIndex = currentWordChars.length;
             const isExtra = charIndex >= currentWord.length;
+            const isWrong = isExtra || key !== currentWord[charIndex];
+
+            // stop on error (letter): wrong keys aren't typed, but still count as mistakes
+            if (state.stopOnError === 'letter' && isWrong) {
+              if (state.mods.includes('sudden-death')) {
+                get().endTest('sudden death: wrong letter');
+              } else {
+                set({ rejectedKeys: state.rejectedKeys + 1 });
+              }
+              return;
+            }
 
             currentWordChars.push({
               char: key,
@@ -430,6 +517,9 @@ export const useTypingStore = create<TypingState>()(
           // older versions stored duplicate cloud copies of the same test
           results: dedupeResults(merged.results ?? []),
           mods: (merged.mods ?? []).filter((mod) => mod in MODS),
+          lightTheme: merged.lightTheme in themes ? merged.lightTheme : DEFAULT_QOL_SETTINGS.lightTheme,
+          darkTheme: merged.darkTheme in themes ? merged.darkTheme : DEFAULT_QOL_SETTINGS.darkTheme,
+          font: merged.font in FONTS ? merged.font : DEFAULT_FONT,
         };
       },
       partialize: (state) => ({

@@ -5,13 +5,22 @@ import { Check } from "lucide-react";
 import {
   useTypingStore,
   type CaretStyle,
+  type ConfidenceMode,
+  type IndicateTypos,
+  type KeySound,
+  type PaceCaret,
   type QolSettings,
+  type RandomTheme,
+  type ReduceMotion,
+  type StopOnError,
   type RestartKeybind,
   type SpellLadderResult,
   type TestResult,
 } from "@/lib/store";
 import { MODS, MOD_KEYS, type Mod } from "@/lib/mods";
-import { themes, type Theme, type ThemeKey } from "@/lib/themes";
+import { themes, isLightTheme, type Theme, type ThemeKey } from "@/lib/themes";
+import { FONTS, fontCssValue, type FontKey } from "@/lib/fonts";
+import { playTypingSound } from "@/lib/sounds";
 import { PageContainer } from "@/components/app-shell";
 import { Kbd } from "@/components/result-parts";
 
@@ -25,22 +34,56 @@ const CARET_STYLES: CaretStyle[] = ["line", "block", "underline"];
 const VISIBLE_LINES: QolSettings["visibleLines"][] = [2, 3, 4];
 
 const SECTIONS = [
-  { id: "theme", label: "theme" },
   { id: "typing", label: "typing" },
+  { id: "theme", label: "theme" },
   { id: "interface", label: "interface" },
   { id: "fun", label: "fun" },
   { id: "data", label: "data" },
 ];
 
-function isLight(hex: string) {
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
-  return 0.299 * r + 0.587 * g + 0.114 * b > 150;
-}
-
 const themeEntries = Object.entries(themes) as [ThemeKey, Theme][];
 const THEME_GROUPS = [
-  { label: "dark", themes: themeEntries.filter(([, t]) => !isLight(t.bg)) },
-  { label: "light", themes: themeEntries.filter(([, t]) => isLight(t.bg)) },
+  { label: "dark", isLight: false, themes: themeEntries.filter(([key]) => !isLightTheme(key)) },
+  { label: "light", isLight: true, themes: themeEntries.filter(([key]) => isLightTheme(key)) },
+];
+
+type Option<T> = { value: T; label: string };
+const PACE_CARET_OPTIONS: Option<PaceCaret>[] = [
+  { value: "off", label: "off" },
+  { value: "pb", label: "pb" },
+  { value: "average", label: "average" },
+  { value: "custom", label: "custom" },
+];
+const STOP_ON_ERROR_OPTIONS: Option<StopOnError>[] = [
+  { value: "off", label: "off" },
+  { value: "letter", label: "letter" },
+  { value: "word", label: "word" },
+];
+const CONFIDENCE_OPTIONS: Option<ConfidenceMode>[] = [
+  { value: "off", label: "off" },
+  { value: "on", label: "on" },
+  { value: "max", label: "max" },
+];
+const INDICATE_TYPOS_OPTIONS: Option<IndicateTypos>[] = [
+  { value: "off", label: "off" },
+  { value: "below", label: "below" },
+  { value: "replace", label: "replace" },
+];
+const KEY_SOUND_OPTIONS: Option<KeySound>[] = [
+  { value: "off", label: "off" },
+  { value: "click", label: "click" },
+  { value: "pop", label: "pop" },
+  { value: "typewriter", label: "typewriter" },
+];
+const RANDOM_THEME_OPTIONS: Option<RandomTheme>[] = [
+  { value: "off", label: "off" },
+  { value: "test", label: "each test" },
+  { value: "day", label: "each day" },
+];
+const REDUCE_MOTION_OPTIONS: Option<ReduceMotion>[] = [
+  { value: "auto", label: "auto" },
+  { value: "on", label: "on" },
+  { value: "off", label: "off" },
 ];
 
 function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
@@ -60,7 +103,7 @@ function Row({ title, description, children }: { title: string; description: str
         <h3 className="text-text">{title}</h3>
         <p className="text-sm text-sub">{description}</p>
       </div>
-      <div className="flex gap-2">{children}</div>
+      <div className="flex flex-wrap gap-2">{children}</div>
     </div>
   );
 }
@@ -149,6 +192,52 @@ function ModTile({ mod, active, onClick }: { mod: Mod; active: boolean; onClick:
         <div className="text-xs">{mod.description}</div>
       </div>
     </div>
+  );
+}
+
+/** One Choice button per option. */
+function Options<T extends string>({ options, value, onChange }: { options: Option<T>[]; value: T; onChange: (value: T) => void }) {
+  return (
+    <>
+      {options.map((option) => (
+        <Choice key={option.value} active={value === option.value} onClick={() => onChange(option.value)}>
+          {option.label}
+        </Choice>
+      ))}
+    </>
+  );
+}
+
+/** Whole-number input, clamped to min..max; with `zeroIsOff`, 0 shows as "off". */
+function NumberInput({
+  value,
+  onChange,
+  min,
+  max,
+  suffix,
+  zeroIsOff = false,
+}: {
+  value: number;
+  onChange: (value: number) => void;
+  min: number;
+  max: number;
+  suffix: string;
+  zeroIsOff?: boolean;
+}) {
+  return (
+    <label className="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg bg-sub-alt text-sm focus-within:ring-2 focus-within:ring-main">
+      <input
+        type="number"
+        inputMode="numeric"
+        min={min}
+        max={max}
+        value={zeroIsOff && value === 0 ? "" : value}
+        placeholder={zeroIsOff ? "off" : undefined}
+        onChange={(e) => onChange(Math.min(max, Math.max(min, Math.round(Number(e.target.value) || 0))))}
+        className="w-full bg-transparent outline-none text-text placeholder:text-sub [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+      />
+      <span className="text-sub">{suffix}</span>
+    </label>
   );
 }
 
@@ -251,19 +340,6 @@ export default function SettingsPage() {
         <div>
           <h1 className="md:hidden text-3xl text-text mb-10">settings</h1>
 
-          <Section id="theme" title="theme">
-            {THEME_GROUPS.map((group) => (
-              <div key={group.label}>
-                <h3 className="text-sm text-sub mb-3">{group.label}</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {group.themes.map(([key, t]) => (
-                    <ThemeButton key={key} themeKey={key} theme={t} active={theme === key} onClick={() => setTheme(key)} />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </Section>
-
           <Section id="typing" title="typing">
             <Row title="font size" description="Size of the words in the typing test.">
               {FONT_SIZES.map((size) => (
@@ -301,6 +377,98 @@ export default function SettingsPage() {
               <OnOff value={store.freedomMode} onChange={(freedomMode) => updateSettings({ freedomMode })} />
             </Row>
 
+            <Row
+              title="stop on error"
+              description="Letter: wrong keys aren't typed (they still count as mistakes). Word: space only moves on from a correct word."
+            >
+              <Options options={STOP_ON_ERROR_OPTIONS} value={store.stopOnError} onChange={(stopOnError) => updateSettings({ stopOnError })} />
+            </Row>
+
+            <Row title="confidence mode" description="On: you can't go back to previous words. Max: backspace is disabled.">
+              <Options
+                options={CONFIDENCE_OPTIONS}
+                value={store.confidenceMode}
+                onChange={(confidenceMode) => updateSettings({ confidenceMode })}
+              />
+            </Row>
+
+            <Row title="strict space" description="Space only moves to the next word once every letter is typed.">
+              <OnOff value={store.strictSpace} onChange={(strictSpace) => updateSettings({ strictSpace })} />
+            </Row>
+
+            <Row title="indicate typos" description="Show the letter you actually typed, under the expected one or in its place.">
+              <Options
+                options={INDICATE_TYPOS_OPTIONS}
+                value={store.indicateTypos}
+                onChange={(indicateTypos) => updateSettings({ indicateTypos })}
+              />
+            </Row>
+
+            <Row title="pace caret" description="A ghost caret moving at your personal best, your recent average, or a custom speed.">
+              <Options options={PACE_CARET_OPTIONS} value={store.paceCaret} onChange={(paceCaret) => updateSettings({ paceCaret })} />
+            </Row>
+
+            {store.paceCaret === "custom" && (
+              <Row title="custom pace" description="Speed of the pace caret.">
+                <NumberInput
+                  value={store.paceCaretWpm}
+                  onChange={(paceCaretWpm) => updateSettings({ paceCaretWpm })}
+                  min={1}
+                  max={500}
+                  suffix="wpm"
+                />
+              </Row>
+            )}
+
+            <Row title="minimum speed" description="Fail the test if your live wpm drops below this (after the first 3 seconds).">
+              <NumberInput value={store.minWpm} onChange={(minWpm) => updateSettings({ minWpm })} min={0} max={500} suffix="wpm" zeroIsOff />
+            </Row>
+
+            <Row title="minimum accuracy" description="Fail the test if your live accuracy drops below this.">
+              <NumberInput
+                value={store.minAccuracy}
+                onChange={(minAccuracy) => updateSettings({ minAccuracy })}
+                min={0}
+                max={100}
+                suffix="%"
+                zeroIsOff
+              />
+            </Row>
+
+            <Row title="keypress sound" description="Play a sound on every keypress.">
+              <Options
+                options={KEY_SOUND_OPTIONS}
+                value={store.keySound}
+                onChange={(keySound) => {
+                  updateSettings({ keySound });
+                  playTypingSound(false); // preview
+                }}
+              />
+            </Row>
+
+            <Row title="error sound" description="Play a buzz on mistakes instead of the keypress sound.">
+              <OnOff
+                value={store.errorSound}
+                onChange={(errorSound) => {
+                  updateSettings({ errorSound });
+                  if (errorSound) playTypingSound(true); // preview
+                }}
+              />
+            </Row>
+
+            <Row title="sound volume" description="Volume of the keypress and error sounds.">
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={Math.round(store.soundVolume * 100)}
+                onChange={(e) => updateSettings({ soundVolume: Number(e.target.value) / 100 })}
+                onPointerUp={() => playTypingSound(false)}
+                className="flex-1 accent-(--main)"
+                aria-label="sound volume"
+              />
+            </Row>
+
             <Row title="restart shortcut" description="Keys that restart the current test.">
               {RESTART_KEYBINDS.map((option) => (
                 <Choice key={option.key} active={restartKeybind === option.key} onClick={() => setRestartKeybind(option.key)}>
@@ -308,6 +476,41 @@ export default function SettingsPage() {
                 </Choice>
               ))}
             </Row>
+          </Section>
+
+          <Section id="theme" title="theme">
+            <Row title="follow system theme" description="Switch between a dark and a light theme with your system's dark mode.">
+              <OnOff value={store.followSystemTheme} onChange={(followSystemTheme) => updateSettings({ followSystemTheme })} />
+            </Row>
+
+            <Row title="random theme" description="Pick a random theme for every test, or a new one each day.">
+              <Options options={RANDOM_THEME_OPTIONS} value={store.randomTheme} onChange={(randomTheme) => updateSettings({ randomTheme })} />
+            </Row>
+
+            {THEME_GROUPS.map((group) => {
+              // with follow system on, each group picks the theme used in that system mode
+              const followKey = group.isLight ? "lightTheme" : "darkTheme";
+              const isActive = (key: ThemeKey) => (store.followSystemTheme ? store[followKey] === key : theme === key);
+              return (
+                <div key={group.label}>
+                  <h3 className="text-sm text-sub mb-3">
+                    {group.label}
+                    {store.followSystemTheme && ` · used when your system is in ${group.label} mode`}
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {group.themes.map(([key, t]) => (
+                      <ThemeButton
+                        key={key}
+                        themeKey={key}
+                        theme={t}
+                        active={isActive(key)}
+                        onClick={() => (store.followSystemTheme ? updateSettings({ [followKey]: key }) : setTheme(key))}
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </Section>
 
           <Section id="interface" title="interface">
@@ -332,6 +535,37 @@ export default function SettingsPage() {
 
             <Row title="confetti" description="Celebrate new personal bests with confetti.">
               <OnOff value={store.showConfetti} onChange={(showConfetti) => updateSettings({ showConfetti })} />
+            </Row>
+
+            <Row title="reduce motion" description="Turn off animations, the caret glide and confetti. Auto follows your system setting.">
+              <Options options={REDUCE_MOTION_OPTIONS} value={store.reduceMotion} onChange={(reduceMotion) => updateSettings({ reduceMotion })} />
+            </Row>
+
+            <Row title="tape mode" description="Show the words in one line that scrolls sideways instead of wrapping.">
+              <OnOff value={store.tapeMode} onChange={(tapeMode) => updateSettings({ tapeMode })} />
+            </Row>
+
+            <Row title="progress bar" description="A thin bar above the words showing how much of the test is done.">
+              <OnOff value={store.showProgressBar} onChange={(showProgressBar) => updateSettings({ showProgressBar })} />
+            </Row>
+
+            <Row title="keyboard" description="Show an on-screen keyboard with the next key highlighted.">
+              <OnOff value={store.showKeymap} onChange={(showKeymap) => updateSettings({ showKeymap })} />
+            </Row>
+
+            <Row title="font" description="Font used everywhere in the app.">
+              {(Object.keys(FONTS) as FontKey[]).map((key) => (
+                <button
+                  key={key}
+                  onClick={() => updateSettings({ font: key })}
+                  className={`basis-[calc(50%-0.25rem)] grow py-2 rounded-lg text-sm transition-colors ${
+                    store.font === key ? "bg-main text-bg" : "bg-sub-alt text-text hover:bg-text hover:text-bg"
+                  }`}
+                  style={{ fontFamily: fontCssValue(key) }}
+                >
+                  {FONTS[key].name}
+                </button>
+              ))}
             </Row>
           </Section>
 

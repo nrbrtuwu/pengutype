@@ -238,6 +238,13 @@ export const LEGACY_THEME_KEYS: Record<string, ThemeKey> = {
   catppuccin: "catppuccin_mocha",
 };
 
+/** Whether a theme has a light background (used to group themes and for follow-system / random theme). */
+export function isLightTheme(key: ThemeKey): boolean {
+  const hex = themes[key].bg;
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  return 0.299 * r + 0.587 * g + 0.114 * b > 150;
+}
+
 /** CSS variables exposed on <html>; Tailwind maps them to bg-bg, text-main, text-sub, bg-sub-alt, etc. */
 export function themeCssVars(theme: Theme): Record<string, string> {
   return {
