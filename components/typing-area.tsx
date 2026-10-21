@@ -262,9 +262,6 @@ export function TypingArea() {
   }
 
   const mistakes = typedChars.reduce((sum, word) => sum + word.filter((c) => !c.correct || c.extra).length, 0);
-  const currentWord = words[currentWordIndex] ?? "";
-  const typedInWord = typedChars[currentWordIndex]?.length ?? 0;
-  const nextKey = typedInWord < currentWord.length ? currentWord[typedInWord] : " ";
   // Tape mode: slide the whole line so the caret stays at a fixed spot
   const tapeOffset = clipWidth * TAPE_CARET_POSITION - caretPosition.x;
 
@@ -324,7 +321,7 @@ export function TypingArea() {
         </div>
       </FunStage>
 
-      {showKeymap && <Keymap nextKey={nextKey} />}
+      {showKeymap && <Keymap />}
     </>
   );
 }

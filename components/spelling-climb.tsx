@@ -522,7 +522,7 @@ export function SpellingClimb() {
               </motion.div>
             </AnimatePresence>
           </FunStage>
-          {showKeymap && <Keymap nextKey={currentWord[typed.length] ?? null} />}
+          {showKeymap && <Keymap />}
           </>
         )}
       </div>

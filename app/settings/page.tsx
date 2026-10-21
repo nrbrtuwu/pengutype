@@ -549,7 +549,7 @@ export default function SettingsPage() {
               <OnOff value={store.showProgressBar} onChange={(showProgressBar) => updateSettings({ showProgressBar })} />
             </Row>
 
-            <Row title="keyboard" description="Show an on-screen keyboard with the next key highlighted.">
+            <Row title="keyboard" description="Show an on-screen keyboard that lights up the keys you press.">
               <OnOff value={store.showKeymap} onChange={(showKeymap) => updateSettings({ showKeymap })} />
             </Row>
 
